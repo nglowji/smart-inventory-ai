@@ -76,6 +76,9 @@ export default function Dashboard({
         </span>
         <span>Cập nhật {dateTime(summary.as_of)} · Giờ Việt Nam</span>
       </div>
+      <p className="dashboard-context-note">
+        S? li?u t?n l? hi?n t?i; kho?ng ng?y ?p d?ng cho giao d?ch v? bi?u ??.
+      </p>
       <section className="metric-grid" aria-label="Tổng quan kho">
         <button className="kpi" onClick={() => navigate("Sản phẩm")}>
           <div className="kpi-label">
@@ -128,8 +131,15 @@ export default function Dashboard({
       </section>
 
       <section className="stock-totals" aria-label="T?ng t?n theo ??n v?">
-        <span>T?ng l??ng t?n <small>to?n b? s?n ph?m</small></span>
-        {Object.entries(summary.stock_by_unit).map(([stockUnit, amount]) => <div key={stockUnit}><strong>{quantity(amount)}</strong><span>{stockUnit}</span></div>)}
+        <span>
+          T?ng l??ng t?n <small>to?n b? s?n ph?m</small>
+        </span>
+        {Object.entries(summary.stock_by_unit).map(([stockUnit, amount]) => (
+          <div key={stockUnit}>
+            <strong>{quantity(amount)}</strong>
+            <span>{stockUnit}</span>
+          </div>
+        ))}
       </section>
       <div className="dashboard-grid">
         <section className="panel flow-panel">

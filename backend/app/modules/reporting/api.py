@@ -51,8 +51,10 @@ def summary(
     units = ("PCS", "KG", "LITER")
     stock_totals = [
         select(func.coalesce(func.sum(StockBalance.on_hand), 0))
-        .select_from(StockBalance).join(Product, StockBalance.product_id == Product.id)
-        .where(Product.unit == unit).scalar_subquery()
+        .select_from(StockBalance)
+        .join(Product, StockBalance.product_id == Product.id)
+        .where(Product.unit == unit)
+        .scalar_subquery()
         for unit in units
     ]
     row = session.execute(
