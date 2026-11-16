@@ -1,0 +1,30 @@
+﻿# Markdown: only README.md may be committed
+*.[mM][dD]
+!README.md
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.aws/
+
+# Dependencies and build output
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+dist/
+build/
+coverage/
+
+# Local tooling and OS files
+.agents/
+.codex/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log
