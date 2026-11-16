@@ -28,7 +28,7 @@ def summary(date_from: date | None = None, date_to: date | None = None,
     low_count = select(func.count()).select_from(Product).join(StockBalance).where(
         Product.is_active.is_(True), Product.min_stock > 0, StockBalance.on_hand < Product.min_stock
     )
-    value = select(func.coalesce(func.sum(StockBalance.on_hand * Product.unit_cost_vnd), 0)).join(
+    value = select(func.coalesce(func.sum(StockBalance.on_hand * Product.unit_cost_vnd), 0)).select_from(StockBalance).join(
         Product, StockBalance.product_id == Product.id
     )
     movements = select(func.count()).select_from(StockMovement).where(

@@ -58,6 +58,10 @@ def post_movement(session: Session, user: User, payload: MovementCreate, key: UU
 
     # Coordinate with catalog changes: product first, then balance. Both locks live in this txn.
     product = get_product(session, payload.product_id, lock=True)
+    # A retry may have been waiting for this product while the first request committed.
+    existing = session.scalar(select(StockMovement).where(StockMovement.idempotency_key == str(key)))
+    if existing:
+        return replay(session, existing, fingerprint)
     if not product.is_active:
         raise DomainError(409, "PRODUCT_ARCHIVED", "Sản phẩm đã ngừng hoạt động.")
     if product.unit == "PCS" and payload.quantity != payload.quantity.to_integral_value():
