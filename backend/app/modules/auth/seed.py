@@ -3,27 +3,33 @@
 import getpass
 import os
 
+from dotenv import dotenv_values
 from pydantic import EmailStr, TypeAdapter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import Settings
+from app.core.config import PROJECT_ROOT, Settings
 from app.db.connection import build_engine
 from app.db.models import User
 from app.modules.auth.api import passwords
 
 
 def main():
+    local = dotenv_values(PROJECT_ROOT / ".env")
     email = (
         str(
             TypeAdapter(EmailStr).validate_python(
-                os.environ.get("ADMIN_EMAIL") or input("Admin email: ")
+                os.environ.get("ADMIN_EMAIL") or local.get("ADMIN_EMAIL") or input("Admin email: ")
             )
         )
         .strip()
         .lower()
     )
-    password = os.environ.get("ADMIN_PASSWORD") or getpass.getpass("Admin password (12+ chars): ")
+    password = (
+        os.environ.get("ADMIN_PASSWORD")
+        or local.get("ADMIN_PASSWORD")
+        or getpass.getpass("Admin password (12+ chars): ")
+    )
     if len(password) < 12:
         raise SystemExit("Password must have at least 12 characters.")
     engine = build_engine(Settings())

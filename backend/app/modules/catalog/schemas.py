@@ -18,6 +18,14 @@ Unit = Literal["PCS", "KG", "LITER"]
 class Input(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    @field_validator("*", mode="before")
+    @classmethod
+    def require_decimal_strings(cls, value, info):
+        if info.field_name in {"min_stock", "unit_cost_vnd"}:
+            if value is not None and not isinstance(value, str):
+                raise ValueError("Decimal values must be JSON strings")
+        return value
+
 
 class PatchInput(Input):
     @field_validator("*", mode="before")

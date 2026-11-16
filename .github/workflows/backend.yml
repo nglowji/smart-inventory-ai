@@ -1,4 +1,4 @@
-name: Backend foundation
+name: Backend checks
 on: [push, pull_request]
 jobs:
   test:

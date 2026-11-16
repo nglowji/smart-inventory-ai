@@ -103,6 +103,8 @@ def test_concurrent_duplicate_sku_uses_db_unique_constraint(catalog_client, admi
         {"on_hand": "100"},
         {"min_stock": "NaN"},
         {"min_stock": "100000000000"},
+        {"min_stock": 10},
+        {"unit_cost_vnd": 3500.0},
     ],
 )
 def test_product_validation(catalog_client, admin_headers, changes):
