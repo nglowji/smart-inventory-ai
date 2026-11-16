@@ -1,4 +1,4 @@
-﻿# SmartInventory AI
+# SmartInventory AI
 
 Ứng dụng quản lý **một kho**, có trợ lý AI chỉ đọc dữ liệu. Đã triển khai **Phase 0 — Foundation** và **Phase 1 — Catalog**. Chưa có API nhập/xuất, dashboard, AI hoặc frontend.
 
@@ -156,3 +156,23 @@ Tham khảo chính thức: [Alembic](https://alembic.sqlalchemy.org/en/latest/tu
 - .env không được commit. Mọi file .md ngoài README.md, bộ skill và đặc tả gốc được giữ local theo yêu cầu.
 - Phase 2: transactions nhập/xuất/điều chỉnh, row locking, Decimal theo đơn vị, idempotency và test concurrent OUT trên PostgreSQL thật.
 - Mỗi phase đều có giải thích What → Why → How → Trade-offs → đối chiếu .NET và điểm dừng trước phase tiếp theo.
+
+## Giao di?n v0 ? b?n duy?t thi?t k?
+
+Frontend n?m trong `frontend/`, d?ng React + TypeScript + Vite. ??y l? **b?n m?u giao di?n**, ch?a k?t n?i API v? kh?ng thay ??i d? li?u kho. D? li?u hi?n th? l? 5 s?n ph?m trong b? fixture UAT c?a ??c t?, c? nh?n D? li?u m?u. C?c m?n h?nh nghi?p v? c?n thi?u c? th?ng b?o ch? tri?n khai.
+
+```powershell
+cd D:\IT\smart-inventory-ai\frontend
+npm ci
+npm run dev
+```
+
+M? http://127.0.0.1:5173/. D?ng server b?ng Ctrl+C. Ki?m tra TypeScript v? build production b?ng `npm run build`; build n?m trong `frontend/dist/` v? kh?ng ??a v?o Git.
+
+B?n v0 cho ph?p chuy?n T?ng quan/S?n ph?m, t?m theo t?n/SKU, l?c d??i ng??ng, m? form xem tr??c, ??i m?t ?? v? giao di?n t?i. Form kh?ng c? ch?c n?ng l?u. Dashboard/AI/bi?u ?? kh?ng gi? l?p k?t n?i kho th?t; c?c v?ng ch?a tri?n khai ??u ???c ghi r?.
+
+**Hi?u frontend:** `src/main.tsx` g?n React v?o trang HTML. `src/App.tsx` d?ng b? c?c v? qu?n l? tr?ng th?i giao di?n b?ng `useState`; nh?p t?m ki?m ho?c ??i b? l?c l?m React v? l?i danh s?ch. `src/demo.ts` ch?a fixture ri?ng, c?n `src/styles.css` ??nh ngh?a m?u, kho?ng c?ch, font v? b? c?c theo k?ch th??c m?n h?nh. Font Be Vietnam Pro ???c ??ng g?i local, kh?ng ph? thu?c Google Fonts l?c m? trang.
+
+**??i chi?u .NET:** Component g?n v?i Razor/Blazor component; props g?n tham s? component, state g?n tr?ng th?i component. TypeScript gi?p ph?t hi?n l?i ki?u khi build, nh?ng kh?ng thay th? validation c?a FastAPI/PostgreSQL. B?n v0 ch?a g?i HTTP; b??c t?ch h?p s? thay ngu?n fixture b?ng d? li?u t? API c? JWT.
+
+**?i?m d?ng:** Duy?t b? c?c v0 tr??c khi ho?n thi?n component, tr?ng th?i nghi?p v? v? n?i API theo workflow web-design-engineer. Backend Phase 2 ch?a ???c tri?n khai trong t?c v? giao di?n n?y.
