@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     )
     db_connect_timeout: int = Field(default=3, ge=1, le=30)
     cors_origins: list[str] = ["http://localhost:5173"]
+    jwt_secret: SecretStr | None = Field(default=None, min_length=32)
+    access_token_minutes: int = Field(default=30, ge=1, le=120)
 
     @field_validator("database_url")
     @classmethod

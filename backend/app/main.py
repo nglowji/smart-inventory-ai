@@ -6,7 +6,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import Settings
+from app.core.errors import install_error_handlers
 from app.db.connection import build_engine, database_is_ready
+from app.modules.auth.api import router as auth_router
+from app.modules.catalog.api import router as catalog_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -22,13 +25,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             engine.dispose()
 
-    application = FastAPI(title=config.app_name, version="0.1.0", lifespan=lifespan)
+    application = FastAPI(title=config.app_name, version="0.2.0", lifespan=lifespan)
+    application.state.settings = config
+    install_error_handlers(application)
+    application.include_router(auth_router, prefix="/api/v1")
+    application.include_router(catalog_router, prefix="/api/v1")
     application.add_middleware(
         CORSMiddleware,
         allow_origins=config.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET"],
-        allow_headers=["Content-Type"],
+        allow_methods=["GET", "POST", "PATCH"],
+        allow_headers=["Content-Type", "Authorization"],
     )
 
     @application.get("/health", tags=["Health"])

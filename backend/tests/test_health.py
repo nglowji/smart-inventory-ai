@@ -27,8 +27,9 @@ def test_readiness_when_database_is_available():
         assert response.json() == {"status": "ready", "database": "available"}
 
 
-def test_openapi_exposes_only_foundation_endpoints():
+def test_openapi_exposes_catalog_but_no_stock_write_endpoints():
     with TestClient(create_app(Settings(_env_file=None))) as client:
-        assert set(client.get("/openapi.json").json()["paths"]) == {
-            "/health", "/health/ready"
-        }
+        paths = client.get("/openapi.json").json()["paths"]
+        assert {"/health", "/health/ready", "/api/v1/products"} <= set(paths)
+        assert "/api/v1/stock/movements" not in paths
+        assert "delete" not in paths["/api/v1/products/{product_id}"]
