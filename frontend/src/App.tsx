@@ -1,107 +1,520 @@
-import { useEffect, useRef, useState } from 'react'
-import type { Product } from './demo'
-import { formatMoney, formatQuantity, lowStock, products } from './demo'
+import { useEffect, useState } from "react";
+import type { FormEvent } from "react";
+import { api, errorMessage, getToken, setToken } from "./api";
+import { localDate } from "./format";
+import type { Range, User } from "./types";
+import Dialog from "./components/Dialog";
+import type { Action } from "./components/Dialog";
+import Icon from "./components/Icon";
+import Dashboard from "./screens/Dashboard";
+import { MasterData, Products } from "./screens/Catalog";
+import History from "./screens/History";
+import { Loading } from "./components/Common";
 
-type Screen = 'Tổng quan' | 'Sản phẩm' | 'Danh mục' | 'Nhà cung cấp' | 'Giao dịch kho' | 'Trợ lý AI'
-const screens: Screen[] = ['Tổng quan', 'Sản phẩm', 'Danh mục', 'Nhà cung cấp', 'Giao dịch kho', 'Trợ lý AI']
+const navigation = [
+  { label: "Tổng quan", icon: "overview" },
+  { label: "Sản phẩm", icon: "box" },
+  { label: "Danh mục", icon: "list" },
+  { label: "Nhà cung cấp", icon: "truck" },
+  { label: "Giao dịch kho", icon: "activity" },
+] as const;
+const descriptions: Record<string, string> = {
+  "Tổng quan": "Tình hình kho hàng, cảnh báo và hoạt động trong một góc nhìn.",
+  "Sản phẩm": "Quản lý danh mục hàng hóa và tồn kho theo từng SKU.",
+  "Danh mục": "Sắp xếp sản phẩm thành những nhóm dễ quản lý.",
+  "Nhà cung cấp": "Thông tin đối tác cung ứng hàng hóa cho kho.",
+  "Giao dịch kho": "Theo dõi từng lần nhập, xuất và điều chỉnh tồn kho.",
+};
+function rangeFor(days: number): Range {
+  const end = localDate(new Date());
+  const start = new Date(`${end}T00:00:00Z`);
+  start.setUTCDate(start.getUTCDate() - days + 1);
+  return { date_from: start.toISOString().slice(0, 10), date_to: end };
+}
 
-function ProductDialog({ product, onClose }: { product: Product | 'new'; onClose: () => void }) {
-  const dialog = useRef<HTMLDialogElement>(null)
-  useEffect(() => {
-    dialog.current?.showModal()
-    return () => dialog.current?.close()
-  }, [])
-  const isNew = product === 'new'
+function Login({
+  authenticated,
+  message,
+}: {
+  authenticated: (user: User) => void;
+  message: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function login(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    const data = new FormData(event.currentTarget);
+    try {
+      const result = await api<{ access_token: string }>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: data.get("email"),
+          password: data.get("password"),
+        }),
+      });
+      setToken(result.access_token);
+      const user = await api<User>("/auth/me");
+      authenticated(user);
+    } catch (err) {
+      setToken(null);
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
-    <dialog ref={dialog} className="product-dialog" onCancel={onClose} onClick={event => { if (event.target === event.currentTarget) onClose() }}>
-      <div className="dialog-top"><span className="eyebrow">BẢN XEM TRƯỚC FORM</span><button onClick={onClose} className="icon-button" aria-label="Đóng hộp thoại">×</button></div>
-      <h2>{isNew ? 'Thêm sản phẩm' : product.name}</h2>
-      <p className="muted">Thông tin rõ ràng ngay từ sản phẩm đầu tiên.</p>
-      <div className="form-preview">
-        <label>Mã SKU<input defaultValue={isNew ? '' : product.sku} placeholder="Ví dụ: SP006" /></label>
-        <label>Tên sản phẩm<input defaultValue={isNew ? '' : product.name} placeholder="Nhập tên sản phẩm" /></label>
-        <div className="form-row"><label>Đơn vị<select defaultValue={isNew ? 'PCS' : product.unit}><option value="PCS">Cái (PCS)</option><option value="KG">Kilogram (KG)</option><option value="LITER">Lít (LITER)</option></select></label><label>Tồn tối thiểu<input inputMode="decimal" defaultValue={isNew ? '0' : product.minStock} /></label></div>
-        <label>Đơn giá ước tính (VND)<input inputMode="decimal" defaultValue={isNew ? '0' : product.unitCost} /></label>
-      </div>
-      <div className="inline-note">Đây là bản xem trước bố cục. Thao tác lưu chưa kết nối API và không thay đổi dữ liệu kho.</div>
-      <div className="dialog-actions"><button className="button" onClick={onClose}>Đóng</button><button className="button primary" disabled>Lưu sản phẩm</button></div>
-    </dialog>
-  )
+    <div className="login-page">
+      <section className="login-story">
+        <a className="wordmark" href="/">
+          Smart<span>Inventory</span>
+          <span className="wordmark-ai">AI</span>
+        </a>
+        <div>
+          <span className="eyebrow">KHÔNG GIAN VẬN HÀNH KHO</span>
+          <h1>
+            Mọi sản phẩm.
+            <br />
+            Mọi biến động.
+            <br />
+            <em>Trong tầm kiểm soát.</em>
+          </h1>
+          <p>
+            Quản lý tồn kho chính xác, truy vết từng giao dịch và luôn biết khi
+            nào cần bổ sung hàng.
+          </p>
+          <div className="login-benefits">
+            <span>
+              <Icon name="check" size={16} />
+              Tồn kho theo thời gian thực
+            </span>
+            <span>
+              <Icon name="check" size={16} />
+              Phân quyền rõ ràng
+            </span>
+            <span>
+              <Icon name="check" size={16} />
+              Lịch sử đầy đủ
+            </span>
+          </div>
+        </div>
+        <span className="login-caption">
+          SmartInventory AI · Một kho, một nguồn dữ liệu
+        </span>
+      </section>
+      <section className="login-form-area">
+        <form className="login-form" onSubmit={login}>
+          <span className="badge success">Kho chính</span>
+          <h2>Chào mừng trở lại.</h2>
+          <p>Đăng nhập để truy cập không gian làm việc của bạn.</p>
+          <label>
+            Email
+            <input
+              type="email"
+              name="email"
+              autoComplete="username"
+              placeholder="Email tài khoản của bạn"
+              required
+              autoFocus
+              disabled={busy}
+            />
+          </label>
+          <label>
+            Mật khẩu
+            <input
+              type="password"
+              name="password"
+              autoComplete="current-password"
+              placeholder="Nhập mật khẩu"
+              required
+              disabled={busy}
+            />
+          </label>
+          {(error || message) && (
+            <p className="error-banner" role="alert">
+              {error || message}
+            </p>
+          )}
+          <button className="button primary" disabled={busy}>
+            {busy ? "Đang đăng nhập…" : "Đăng nhập"}
+            <Icon name="arrow" size={18} />
+          </button>
+          <p className="login-help">
+            Tài khoản do quản trị viên cấp. Liên hệ quản trị viên nếu bạn cần
+            quyền truy cập.
+          </p>
+        </form>
+      </section>
+    </div>
+  );
 }
 
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('Tổng quan')
-  const [search, setSearch] = useState('')
-  const [stockFilter, setStockFilter] = useState('all')
-  const [mobileMenu, setMobileMenu] = useState(false)
-  const [selected, setSelected] = useState<Product | 'new' | null>(null)
-  const [tweaks, setTweaks] = useState(false)
-  const [density, setDensity] = useState('balanced')
-  const [dark, setDark] = useState(false)
-  const lowProducts = products.filter(lowStock)
-  const filtered = products.filter(product => {
-    const query = search.trim().toLocaleLowerCase('vi')
-    return `${product.sku} ${product.name}`.toLocaleLowerCase('vi').includes(query)
-      && (stockFilter !== 'low' || lowStock(product))
-  })
-  const estimatedValue = products.reduce((sum, product) => sum + product.onHand * product.unitCost, 0)
-  const catalogScreen = screen === 'Tổng quan' || screen === 'Sản phẩm'
-
-  useEffect(() => { document.title = `SmartInventory — ${screen}` }, [screen])
-
-  function navigate(next: Screen) {
-    setScreen(next)
-    setMobileMenu(false)
-    setSearch('')
-    setStockFilter('all')
+  const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(Boolean(getToken()));
+  const [authMessage, setAuthMessage] = useState("");
+  const [screen, setScreen] = useState("Tổng quan");
+  const [initialLow, setInitialLow] = useState(false);
+  const [mobile, setMobile] = useState(false);
+  const [range, setRange] = useState<Range>(() => rangeFor(30));
+  const [draft, setDraft] = useState(range);
+  const [preset, setPreset] = useState("30");
+  const [rangeError, setRangeError] = useState("");
+  const [version, setVersion] = useState(0);
+  const [action, setAction] = useState<Action | null>(null);
+  const [toast, setToast] = useState("");
+  const refresh = () => setVersion((value) => value + 1);
+  useEffect(() => {
+    if (getToken())
+      void api<User>("/auth/me")
+        .then(setUser)
+        .catch((err) => {
+          setToken(null);
+          setAuthMessage(errorMessage(err));
+        })
+        .finally(() => setAuthLoading(false));
+    const expired = () => {
+      setUser(null);
+      setAction(null);
+      setAuthMessage("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+    };
+    window.addEventListener("session-expired", expired);
+    return () => window.removeEventListener("session-expired", expired);
+  }, []);
+  useEffect(() => {
+    document.title = `SmartInventory — ${user ? screen : "Đăng nhập"}`;
+  }, [screen, user]);
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(""), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+  function navigate(next: string, low = false) {
+    setScreen(next);
+    setInitialLow(low);
+    setMobile(false);
   }
+  function applyDates(event: FormEvent) {
+    event.preventDefault();
+    const difference =
+      (Date.parse(draft.date_to) - Date.parse(draft.date_from)) / 86400000;
+    if (!Number.isFinite(difference) || difference < 0 || difference > 365) {
+      setRangeError("Chọn khoảng ngày hợp lệ, tối đa 366 ngày.");
+      return;
+    }
+    setRangeError("");
+    setRange({ ...draft });
+  }
+  function logout() {
+    setToken(null);
+    setUser(null);
+    setAction(null);
+    setAuthMessage("");
+  }
+  if (authLoading)
+    return (
+      <div className="boot-screen">
+        <Loading />
+      </div>
+    );
+  if (!user)
+    return (
+      <Login
+        authenticated={(value) => {
+          setUser(value);
+          setAuthMessage("");
+          refresh();
+        }}
+        message={authMessage}
+      />
+    );
+  const isAdmin = user.role === "ADMIN";
+  const canWrite = user.role !== "VIEWER";
+  const role = {
+    ADMIN: "Quản trị viên",
+    STAFF: "Nhân viên kho",
+    VIEWER: "Chỉ xem",
+  }[user.role];
+  const hasRange = screen === "Tổng quan" || screen === "Giao dịch kho";
+  const primaryAction: Action | null =
+    screen === "Danh mục" && isAdmin
+      ? { kind: "category" }
+      : screen === "Nhà cung cấp" && isAdmin
+        ? { kind: "supplier" }
+        : screen === "Sản phẩm" && isAdmin
+          ? { kind: "product" }
+          : canWrite && (screen === "Tổng quan" || screen === "Giao dịch kho")
+            ? { kind: "movement" }
+            : null;
+  const actionLabel =
+    primaryAction?.kind === "category"
+      ? "Thêm danh mục"
+      : primaryAction?.kind === "supplier"
+        ? "Thêm nhà cung cấp"
+        : primaryAction?.kind === "product"
+          ? "Thêm sản phẩm"
+          : "Tạo giao dịch";
 
   return (
-    <div className={`app ${dark ? 'dark' : ''} density-${density}`}>
-      <a className="skip-link" href="#main-content">Đến nội dung chính</a>
-      {mobileMenu && <button className="menu-backdrop" aria-label="Đóng menu" onClick={() => setMobileMenu(false)} />}
-      <aside className={`sidebar ${mobileMenu ? 'is-open' : ''}`}>
-        <a className="wordmark" href="#" onClick={event => { event.preventDefault(); navigate('Tổng quan') }}>Smart<span>Inventory</span><span className="wordmark-ai">AI</span></a>
-        <div className="workspace"><div className="workspace-mark">K</div><div><strong>Kho chính</strong><span>Không gian làm việc</span></div><span className="workspace-chevron" aria-hidden="true">⌄</span></div>
-        <p className="nav-label">QUẢN LÝ KHO</p>
-        <nav aria-label="Điều hướng chính">{screens.map((item, index) => <button key={item} className={`nav-item ${screen === item ? 'active' : ''} ${index === 5 ? 'ai-nav' : ''}`} aria-current={screen === item ? 'page' : undefined} onClick={() => navigate(item)}><span>{item}</span>{item === 'Sản phẩm' && <span className="nav-count">5</span>}{item === 'Trợ lý AI' && <span className="read-only">Chỉ đọc</span>}</button>)}</nav>
-        <div className="sidebar-bottom"><div className="quiet-rule" /><p>Một kho. Mọi thứ rõ ràng.</p><span>SmartInventory AI · Bản thiết kế v0</span><a href="http://127.0.0.1:8000/docs" target="_blank" rel="noreferrer">Mở tài liệu API <span aria-hidden="true">↗</span></a></div>
+    <div className="app live-app">
+      <a className="skip-link" href="#main-content">
+        Đến nội dung chính
+      </a>
+      {mobile && (
+        <button
+          className="menu-backdrop"
+          aria-label="Đóng menu"
+          onClick={() => setMobile(false)}
+        />
+      )}
+      <aside className={`sidebar ${mobile ? "is-open" : ""}`}>
+        <a
+          href="#main-content"
+          className="wordmark"
+          onClick={() => navigate("Tổng quan")}
+        >
+          Smart<span>Inventory</span>
+          <span className="wordmark-ai">AI</span>
+        </a>
+        <div className="workspace">
+          <div className="workspace-mark">
+            <Icon name="box" size={19} />
+          </div>
+          <div>
+            <strong>Kho chính</strong>
+            <span>Không gian làm việc</span>
+          </div>
+        </div>
+        <p className="nav-label">VẬN HÀNH</p>
+        <nav aria-label="Điều hướng chính">
+          {navigation.map((item) => (
+            <button
+              className={`nav-item ${screen === item.label ? "active" : ""}`}
+              aria-current={screen === item.label ? "page" : undefined}
+              key={item.label}
+              onClick={() => navigate(item.label)}
+            >
+              <Icon name={item.icon} size={19} />
+              <span>{item.label}</span>
+              {screen === item.label && <span className="nav-active-dot" />}
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-note">
+          <Icon name="check" size={17} />
+          <div>
+            <strong>Dữ liệu tập trung</strong>
+            <p>Mọi thay đổi được lưu trực tiếp vào kho của bạn.</p>
+          </div>
+        </div>
+        <div className="sidebar-user">
+          <div className="avatar">{user.email.slice(0, 2).toUpperCase()}</div>
+          <div>
+            <strong title={user.email}>{user.email}</strong>
+            <span>{role}</span>
+          </div>
+          <button
+            className="icon-button"
+            onClick={logout}
+            aria-label="Đăng xuất"
+            title="Đăng xuất"
+          >
+            <Icon name="logout" size={17} />
+          </button>
+        </div>
       </aside>
-
       <div className="workspace-content">
-        <header className="topbar"><div className="breadcrumb"><button className="icon-button mobile-toggle" aria-label="Mở menu" aria-expanded={mobileMenu} onClick={() => setMobileMenu(!mobileMenu)}>☰</button><span>Không gian làm việc</span><span className="crumb-divider">/</span><strong>{screen}</strong></div><div className="topbar-right"><span className="prototype-label"><span className="status-dot" />Bản xem trước</span><span className="topbar-divider" /><div className="avatar" aria-label="Tài khoản minh họa Admin">AD</div></div></header>
-
+        <header className="topbar">
+          <div className="breadcrumb">
+            <button
+              className="icon-button mobile-toggle"
+              onClick={() => setMobile(!mobile)}
+              aria-label="Mở menu"
+              aria-expanded={mobile}
+            >
+              <Icon name="menu" />
+            </button>
+            <span>Kho chính</span>
+            <span className="crumb-divider">/</span>
+            <strong>{screen}</strong>
+          </div>
+          <div className="topbar-right">
+            <span className="topbar-caption">Asia/Ho_Chi_Minh · VND</span>
+            <span className="badge soft">{role}</span>
+          </div>
+        </header>
         <main id="main-content" tabIndex={-1}>
-          <div className="demo-notice"><span className="demo-label">DỮ LIỆU MẪU</span><p>Bản thiết kế giao diện — sử dụng bộ dữ liệu UAT, chưa kết nối kho thực.</p><span className="notice-version">v0</span></div>
-          <div className="page-heading"><div><p className="page-kicker">KHO CHÍNH</p><h1>{screen === 'Tổng quan' ? 'Nắm rõ kho hàng của bạn.' : screen}</h1><p className="page-description">{screen === 'Tổng quan' ? 'Tồn kho, cảnh báo và sản phẩm — trong một góc nhìn.' : screen === 'Sản phẩm' ? 'Quản lý thông tin sản phẩm và theo dõi tồn kho theo từng SKU.' : 'Xem trước cấu trúc màn hình trong SmartInventory AI.'}</p></div>{catalogScreen && <button className="button primary" onClick={() => setSelected('new')}><span aria-hidden="true">＋</span>Thêm sản phẩm</button>}</div>
-
-          {catalogScreen ? <>
-            {screen === 'Tổng quan' && <section className="metrics" aria-label="Số liệu kho mẫu">
-              <div className="metric"><div className="metric-label">Sản phẩm đang hoạt động<span className="metric-symbol" aria-hidden="true">↗</span></div><div className="metric-value">05<span>SKU</span></div><p>Trong bộ dữ liệu minh họa</p></div>
-              <button className="metric metric-clickable" onClick={() => { setScreen('Sản phẩm'); setStockFilter('low') }}><div className="metric-label">Dưới mức tồn tối thiểu<span className="attention-symbol" aria-hidden="true">!</span></div><div className="metric-value warning-text">02<span>SKU</span></div><p><span className="warning-dot" />Cần kiểm tra để bổ sung hàng <span aria-hidden="true">→</span></p></button>
-              <div className="metric"><div className="metric-label">Giá trị tồn kho<span className="estimate-badge">Ước tính</span></div><div className="metric-value money-value">1.367.000<span>₫</span></div><p>Tồn hiện tại × đơn giá sản phẩm</p><span className="sr-only">{formatMoney(estimatedValue)}</span></div>
-            </section>}
-
-            <div className={`content-grid ${screen === 'Sản phẩm' ? 'full-table' : ''}`}>
-              <section className="panel product-panel" aria-labelledby="products-title">
-                <div className="section-heading"><div><h2 id="products-title">{screen === 'Sản phẩm' ? 'Danh sách sản phẩm' : 'Sản phẩm trong kho'}<span className="count-badge">{products.length}</span></h2><p>Thông tin tồn kho theo từng đơn vị.</p></div>{screen === 'Tổng quan' && <button className="text-button" onClick={() => navigate('Sản phẩm')}>Xem tất cả <span aria-hidden="true">↗</span></button>}</div>
-                <div className="table-toolbar"><label className="search-field"><span aria-hidden="true" className="search-mark" /><input aria-label="Tìm theo tên hoặc SKU" placeholder="Tìm theo tên hoặc SKU…" value={search} onChange={event => setSearch(event.target.value)} /><span className="search-hint">Tìm kiếm</span></label><label className="filter-field"><span className="sr-only">Lọc trạng thái tồn kho</span><select value={stockFilter} onChange={event => setStockFilter(event.target.value)}><option value="all">Tất cả trạng thái</option><option value="low">Dưới ngưỡng</option></select></label></div>
-                <div className="table-scroll" role="region" aria-label="Bảng sản phẩm, có thể cuộn ngang" tabIndex={0}><table><thead><tr><th scope="col">Sản phẩm</th><th scope="col">Đơn vị</th><th scope="col" className="number">Tồn kho</th><th scope="col" className="number min-column">Tối thiểu</th><th scope="col">Trạng thái</th><th scope="col"><span className="sr-only">Chi tiết</span></th></tr></thead><tbody>{filtered.map(product => <tr key={product.sku}><td><button className="product-name" onClick={() => setSelected(product)}>{product.name}</button><span className="product-sku">{product.sku}</span></td><td><span className="unit-label">{product.unit}</span></td><td className={`number stock-number ${lowStock(product) ? 'warning-text' : ''}`}>{formatQuantity(product.onHand)}</td><td className="number muted min-column">{formatQuantity(product.minStock)}</td><td><span className={`stock-status ${lowStock(product) ? 'low' : product.minStock === 0 ? 'neutral' : 'healthy'}`}><span />{lowStock(product) ? 'Dưới ngưỡng' : product.minStock === 0 ? 'Không đặt ngưỡng' : 'Trong ngưỡng'}</span></td><td><button className="row-action" aria-label={`Xem ${product.name}`} onClick={() => setSelected(product)}>↗</button></td></tr>)}</tbody></table>{filtered.length === 0 && <div className="empty-search"><h3>Không tìm thấy sản phẩm</h3><p>Thử một tên hoặc mã SKU khác.</p><button className="text-button" onClick={() => { setSearch(''); setStockFilter('all') }}>Xóa bộ lọc</button></div>}</div>
-                <div className="table-footer"><span aria-live="polite">Hiển thị {filtered.length} / {products.length} sản phẩm mẫu</span><div className="pagination"><button disabled aria-label="Trang trước">‹</button><span aria-current="page">1</span><button disabled aria-label="Trang tiếp theo">›</button></div></div>
-              </section>
-
-              {screen === 'Tổng quan' && <aside className="right-column"><section className="panel attention-panel"><div className="section-heading compact"><h2>Cần chú ý<span className="count-badge warning-badge">2</span></h2></div><p className="section-description">Những sản phẩm đang dưới mức tồn tối thiểu.</p><div className="attention-list">{lowProducts.map(product => <button key={product.sku} className="attention-item" onClick={() => setSelected(product)}><div><strong>{product.name}</strong><span>{product.sku} · {product.unit}</span></div><div className="attention-quantity"><strong>{formatQuantity(product.onHand)}<small> / {formatQuantity(product.minStock)}</small></strong><span>Thiếu {formatQuantity(product.minStock - product.onHand)} {product.unit}</span></div></button>)}</div><p className="attention-footnote">Cảnh báo dựa trên ngưỡng bạn thiết lập.</p></section>
-              <section className="ai-card"><div className="ai-card-top"><span className="ai-caption">TRỢ LÝ KHO HÀNG</span><span className="read-only">Chỉ đọc</span></div><h2>Hỏi một câu.<br />Hiểu rõ kho hàng.</h2><p>Tra cứu tồn và diễn giải số liệu bằng tiếng Việt.</p><button className="ai-prompt" onClick={() => navigate('Trợ lý AI')}>“Mặt hàng nào đang sắp hết?”<span aria-hidden="true">↗</span></button><span className="ai-coming">Bố cục dự kiến · chưa kết nối AI</span></section></aside>}
+          <div className="page-heading">
+            <div>
+              <p className="page-kicker">KHÔNG GIAN LÀM VIỆC</p>
+              <h1>{screen === "Tổng quan" ? "Tổng quan kho hàng" : screen}</h1>
+              <p className="page-description">{descriptions[screen]}</p>
             </div>
-            {screen === 'Tổng quan' && <section className="panel flow-placeholder"><div><span className="eyebrow">BIẾN ĐỘNG KHO</span><h2>Một góc nhìn xuyên suốt.</h2><p>Biểu đồ nhập / xuất theo ngày và đơn vị sẽ xuất hiện khi có dữ liệu giao dịch.</p></div><div className="chart-placeholder"><div className="chart-placeholder-lines" aria-hidden="true"><i /><i /><i /></div><span>Vùng biểu đồ · chờ triển khai</span></div></section>}
-          </> : <section className="panel unfinished-screen"><span className="planned-label">MÀN HÌNH DỰ KIẾN</span><h2>{screen === 'Trợ lý AI' ? 'Dữ liệu thật. Câu trả lời có căn cứ.' : `${screen} — bước tiếp theo.`}</h2><p>{screen === 'Trợ lý AI' ? 'Trợ lý sẽ chỉ tra cứu và giải thích dữ liệu, không thực hiện nhập, xuất hay sửa kho.' : 'Bản v0 tập trung duyệt bố cục Tổng quan và Sản phẩm. Màn hình này chưa được kết nối.'}</p><button className="button" onClick={() => navigate('Tổng quan')}>Quay lại tổng quan <span aria-hidden="true">→</span></button></section>}
-
-          <footer className="page-footer"><span>SmartInventory AI</span><span>Giao diện thử nghiệm · Số liệu không phải dữ liệu kho thực</span></footer>
+            <div className="heading-actions">
+              <button className="button" onClick={refresh}>
+                <Icon name="refresh" size={16} />
+                Làm mới
+              </button>
+              {primaryAction && (
+                <button
+                  className="button primary"
+                  onClick={() => setAction(primaryAction)}
+                >
+                  <Icon name="plus" size={17} />
+                  {actionLabel}
+                </button>
+              )}
+            </div>
+          </div>
+          {hasRange && (
+            <>
+              <form className="range-toolbar" onSubmit={applyDates}>
+                <div className="range-description">
+                  <Icon name="activity" size={18} />
+                  <span>Kỳ báo cáo</span>
+                </div>
+                <select
+                  aria-label="Khoảng ngày nhanh"
+                  value={preset}
+                  onChange={(e) => {
+                    setPreset(e.target.value);
+                    if (e.target.value !== "custom") {
+                      const next = rangeFor(Number(e.target.value));
+                      setRange(next);
+                      setDraft(next);
+                      setRangeError("");
+                    }
+                  }}
+                >
+                  <option value="7">7 ngày gần nhất</option>
+                  <option value="30">30 ngày gần nhất</option>
+                  <option value="90">90 ngày gần nhất</option>
+                  <option value="custom">Tùy chọn</option>
+                </select>
+                <div className="date-inputs">
+                  <label>
+                    <span className="sr-only">Từ ngày</span>
+                    <input
+                      type="date"
+                      required
+                      value={draft.date_from}
+                      onChange={(e) => {
+                        setDraft({ ...draft, date_from: e.target.value });
+                        setPreset("custom");
+                      }}
+                    />
+                  </label>
+                  <span>—</span>
+                  <label>
+                    <span className="sr-only">Đến ngày</span>
+                    <input
+                      type="date"
+                      required
+                      value={draft.date_to}
+                      onChange={(e) => {
+                        setDraft({ ...draft, date_to: e.target.value });
+                        setPreset("custom");
+                      }}
+                    />
+                  </label>
+                  <button className="button" type="submit">
+                    Áp dụng
+                  </button>
+                </div>
+                <span className="range-hint">Giờ Việt Nam (UTC+7)</span>
+              </form>
+              {rangeError && (
+                <p className="error-banner" role="alert">
+                  {rangeError}
+                </p>
+              )}
+            </>
+          )}
+          {screen === "Tổng quan" && (
+            <Dashboard
+              range={range}
+              version={version}
+              user={user}
+              action={setAction}
+              navigate={navigate}
+              refresh={refresh}
+            />
+          )}
+          {screen === "Sản phẩm" && (
+            <Products
+              key={String(initialLow)}
+              initialLow={initialLow}
+              user={user}
+              version={version}
+              action={setAction}
+              refresh={refresh}
+            />
+          )}
+          {screen === "Danh mục" && (
+            <MasterData
+              key="categories"
+              kind="category"
+              user={user}
+              version={version}
+              action={setAction}
+              refresh={refresh}
+              notify={setToast}
+            />
+          )}
+          {screen === "Nhà cung cấp" && (
+            <MasterData
+              key="suppliers"
+              kind="supplier"
+              user={user}
+              version={version}
+              action={setAction}
+              refresh={refresh}
+              notify={setToast}
+            />
+          )}
+          {screen === "Giao dịch kho" && (
+            <History
+              key={JSON.stringify(range)}
+              range={range}
+              version={version}
+              refresh={refresh}
+            />
+          )}
+          <footer className="page-footer">
+            <span>SmartInventory AI</span>
+            <span>
+              Giá trị tồn kho là ước tính, không thay thế số liệu kế toán.
+            </span>
+          </footer>
         </main>
       </div>
-
-      <div className="tweaks"><button className="tweaks-toggle" onClick={() => setTweaks(!tweaks)} aria-expanded={tweaks}>Tùy chỉnh giao diện <span aria-hidden="true">{tweaks ? '−' : '+'}</span></button>{tweaks && <section className="tweaks-panel" aria-label="Tùy chỉnh bản thiết kế"><strong>Tweaks</strong><label>Mật độ hiển thị<select value={density} onChange={event => setDensity(event.target.value)}><option value="comfortable">Thoáng</option><option value="balanced">Cân bằng</option><option value="compact">Gọn</option></select></label><label className="theme-switch"><input type="checkbox" checked={dark} onChange={event => setDark(event.target.checked)} />Giao diện tối</label><p>Chỉ thay đổi cách hiển thị bản mẫu.</p></section>}</div>
-      {selected && <ProductDialog product={selected} onClose={() => setSelected(null)} />}
+      {toast && (
+        <div className="toast" role="status">
+          <Icon name="check" size={18} />
+          <span>{toast}</span>
+          <button
+            className="icon-button"
+            aria-label="Đóng thông báo"
+            onClick={() => setToast("")}
+          >
+            <Icon name="close" size={16} />
+          </button>
+        </div>
+      )}
+      {action && (
+        <Dialog
+          action={action}
+          user={user}
+          close={() => setAction(null)}
+          saved={(message) => {
+            setAction(null);
+            setToast(message);
+            refresh();
+          }}
+        />
+      )}
     </div>
-  )
+  );
 }
