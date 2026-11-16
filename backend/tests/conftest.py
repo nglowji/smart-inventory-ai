@@ -13,7 +13,7 @@ from alembic import command
 from app.core.config import Settings
 from app.db.models import User
 from app.main import create_app
-from app.modules.auth.api import passwords
+from app.modules.auth.service import passwords
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 

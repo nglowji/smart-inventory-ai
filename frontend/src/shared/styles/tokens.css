@@ -1,0 +1,22 @@
+:root {
+  font-family: "Be Vietnam Pro", sans-serif;
+  color: #202824;
+  background: #f5f6f2;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --green: #185d49;
+  --green-hover: #104c3a;
+  --green-soft: #edf3ee;
+  --canvas: #f5f6f2;
+  --surface: #fff;
+  --ink: #202824;
+  --muted: #657168;
+  --faint: #78847b;
+  --line: #e4e9e2;
+  --warning: #906019;
+  --warning-bg: #fbf3e5;
+  --danger: #a43d36;
+  --danger-bg: #fcf0ee;
+  --radius: 10px;
+}

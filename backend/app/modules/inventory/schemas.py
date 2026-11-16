@@ -1,8 +1,27 @@
+from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+class MovementRead(BaseModel):
+    id: UUID
+    product_id: UUID
+    sku: str
+    name: str
+    unit: Literal["PCS", "KG", "LITER"]
+    movement_type: Literal["IN", "OUT", "ADJUST_IN", "ADJUST_OUT"]
+    quantity: str
+    stock_before: str
+    stock_after: str
+    reason: str | None
+    supplier_id: UUID | None
+    reference_code: str | None
+    actor_id: UUID
+    actor_email: str
+    occurred_at: datetime
 
 
 class MovementCreate(BaseModel):

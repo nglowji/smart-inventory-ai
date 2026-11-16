@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Annotated, Generic, Literal, TypeVar
+from typing import Annotated, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator
@@ -105,13 +105,3 @@ class ProductRead(BaseModel):
     unit_cost_vnd: str
     on_hand: str
     is_active: bool
-
-
-T = TypeVar("T")
-
-
-class Page(BaseModel, Generic[T]):
-    items: list[T]
-    total: int
-    page: int
-    page_size: int

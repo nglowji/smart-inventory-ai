@@ -1,29 +1,26 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import select
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
-from app.db.models import Category, Product, Supplier
+from app.core.schemas import Page
 from app.db.session import get_session
-from app.modules.auth.api import admin_user, current_user
+from app.modules.auth.dependencies import admin_user, current_user
+from app.modules.catalog import queries, service
 from app.modules.catalog import schemas as dto
-from app.modules.catalog import service
+from app.modules.catalog.serializers import product_output
 
 router = APIRouter(tags=["Catalog"], dependencies=[Depends(current_user)])
 
 
-@router.get("/categories", response_model=dto.Page[dto.CategoryRead])
+@router.get("/categories", response_model=Page[dto.CategoryRead])
 def list_categories(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     active: bool | None = None,
     session: Session = Depends(get_session),
 ):
-    statement = select(Category).order_by(Category.name, Category.id)
-    if active is not None:
-        statement = statement.where(Category.is_active == active)
-    return service.paginate(session, statement, page, page_size)
+    return queries.list_categories(session, page, page_size, active)
 
 
 @router.post(
@@ -33,10 +30,7 @@ def list_categories(
     dependencies=[Depends(admin_user)],
 )
 def create_category(payload: dto.CategoryCreate, session: Session = Depends(get_session)):
-    category = Category(**payload.model_dump())
-    session.add(category)
-    service.commit_catalog(session)
-    return category
+    return service.save_category(session, payload.model_dump())
 
 
 @router.patch(
@@ -45,24 +39,17 @@ def create_category(payload: dto.CategoryCreate, session: Session = Depends(get_
 def patch_category(
     category_id: UUID, payload: dto.CategoryPatch, session: Session = Depends(get_session)
 ):
-    category = service.require_record(session, Category, category_id)
-    for key, value in payload.model_dump(exclude_unset=True).items():
-        setattr(category, key, value)
-    service.commit_catalog(session)
-    return category
+    return service.save_category(session, payload.model_dump(exclude_unset=True), category_id)
 
 
-@router.get("/suppliers", response_model=dto.Page[dto.SupplierRead])
+@router.get("/suppliers", response_model=Page[dto.SupplierRead])
 def list_suppliers(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     active: bool | None = None,
     session: Session = Depends(get_session),
 ):
-    statement = select(Supplier).order_by(Supplier.name, Supplier.id)
-    if active is not None:
-        statement = statement.where(Supplier.is_active == active)
-    return service.paginate(session, statement, page, page_size)
+    return queries.list_suppliers(session, page, page_size, active)
 
 
 @router.post(
@@ -72,10 +59,7 @@ def list_suppliers(
     dependencies=[Depends(admin_user)],
 )
 def create_supplier(payload: dto.SupplierCreate, session: Session = Depends(get_session)):
-    supplier = Supplier(**payload.model_dump())
-    session.add(supplier)
-    service.commit_catalog(session)
-    return supplier
+    return service.save_supplier(session, payload.model_dump())
 
 
 @router.patch(
@@ -84,14 +68,10 @@ def create_supplier(payload: dto.SupplierCreate, session: Session = Depends(get_
 def patch_supplier(
     supplier_id: UUID, payload: dto.SupplierPatch, session: Session = Depends(get_session)
 ):
-    supplier = service.require_record(session, Supplier, supplier_id)
-    for key, value in payload.model_dump(exclude_unset=True).items():
-        setattr(supplier, key, value)
-    service.commit_catalog(session)
-    return supplier
+    return service.save_supplier(session, payload.model_dump(exclude_unset=True), supplier_id)
 
 
-@router.get("/products", response_model=dto.Page[dto.ProductRead])
+@router.get("/products", response_model=Page[dto.ProductRead])
 def list_products(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -100,21 +80,7 @@ def list_products(
     category_id: UUID | None = None,
     session: Session = Depends(get_session),
 ):
-    statement = (
-        select(Product).options(joinedload(Product.balance)).order_by(Product.sku, Product.id)
-    )
-    if search:
-        statement = statement.where(
-            Product.sku.icontains(search.strip(), autoescape=True)
-            | Product.name.icontains(search.strip(), autoescape=True)
-        )
-    if active is not None:
-        statement = statement.where(Product.is_active == active)
-    if category_id:
-        statement = statement.where(Product.category_id == category_id)
-    result = service.paginate(session, statement, page, page_size)
-    result["items"] = [service.product_output(product) for product in result["items"]]
-    return result
+    return queries.list_products(session, page, page_size, search, active, category_id)
 
 
 @router.post(
@@ -126,7 +92,7 @@ def create_product(payload: dto.ProductCreate, session: Session = Depends(get_se
 
 @router.get("/products/{product_id}", response_model=dto.ProductRead)
 def get_product(product_id: UUID, session: Session = Depends(get_session)):
-    return service.product_output(service.get_product(session, product_id))
+    return product_output(service.get_product(session, product_id))
 
 
 @router.patch(

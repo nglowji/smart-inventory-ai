@@ -1,9 +1,8 @@
 import hashlib
 import json
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -11,38 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import DomainError
 from app.db.models import Product, StockBalance, StockMovement, Supplier, User
-from app.modules.catalog.service import get_product
 from app.modules.inventory.schemas import MovementCreate
-
-LOCAL_ZONE = ZoneInfo("Asia/Ho_Chi_Minh")
-
-
-def date_bounds(date_from: date, date_to: date):
-    if date_to < date_from or (date_to - date_from).days > 365:
-        raise DomainError(422, "VALIDATION_ERROR", "Khoảng ngày phải hợp lệ, tối đa 366 ngày.")
-    start = datetime.combine(date_from, time.min, LOCAL_ZONE).astimezone(UTC)
-    end = datetime.combine(date_to + timedelta(days=1), time.min, LOCAL_ZONE).astimezone(UTC)
-    return start, end
-
-
-def movement_output(movement: StockMovement, product: Product, actor_email: str | None = None):
-    return {
-        "id": str(movement.id),
-        "product_id": str(movement.product_id),
-        "sku": product.sku,
-        "name": product.name,
-        "unit": product.unit,
-        "movement_type": movement.movement_type,
-        "quantity": f"{movement.quantity:.3f}",
-        "stock_before": f"{movement.stock_before:.3f}",
-        "stock_after": f"{movement.stock_after:.3f}",
-        "reason": movement.reason,
-        "supplier_id": str(movement.supplier_id) if movement.supplier_id else None,
-        "reference_code": movement.reference_code,
-        "actor_id": str(movement.actor_id),
-        "actor_email": actor_email,
-        "occurred_at": movement.occurred_at,
-    }
+from app.modules.inventory.serializers import movement_output
 
 
 def replay(session: Session, existing: StockMovement, fingerprint: str):
@@ -69,7 +38,11 @@ def post_movement(session: Session, user: User, payload: MovementCreate, key: UU
         return replay(session, existing, fingerprint)
 
     # Coordinate with catalog changes: product first, then balance. Both locks live in this txn.
-    product = get_product(session, payload.product_id, lock=True)
+    product = session.scalar(
+        select(Product).where(Product.id == payload.product_id).with_for_update()
+    )
+    if product is None:
+        raise DomainError(404, "PRODUCT_NOT_FOUND", "Không tìm thấy sản phẩm.")
     # A retry may have been waiting for this product while the first request committed.
     existing = session.scalar(
         select(StockMovement).where(StockMovement.idempotency_key == str(key))

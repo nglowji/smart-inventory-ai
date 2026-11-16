@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from app.core.config import PROJECT_ROOT, Settings
 from app.db.connection import build_engine
 from app.db.models import User
-from app.modules.auth.api import passwords
+from app.modules.auth.service import passwords
 
 
 def main():

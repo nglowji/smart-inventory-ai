@@ -1,12 +1,12 @@
 from uuid import UUID
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import exists, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.errors import DomainError
 from app.db.models import Category, Product, StockBalance, StockMovement, Supplier
-from app.modules.catalog.schemas import ProductRead
+from app.modules.catalog.serializers import product_output
 
 
 def commit_catalog(session: Session):
@@ -20,12 +20,6 @@ def commit_catalog(session: Session):
         if constraint == "uq_categories_name":
             raise DomainError(409, "CATEGORY_ALREADY_EXISTS", "Tên danh mục đã tồn tại.") from None
         raise
-
-
-def paginate(session: Session, statement, page: int, page_size: int):
-    total = session.scalar(select(func.count()).select_from(statement.order_by(None).subquery()))
-    items = session.scalars(statement.offset((page - 1) * page_size).limit(page_size)).all()
-    return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
 def require_record(session: Session, model, record_id: UUID):
@@ -55,22 +49,6 @@ def get_product(session: Session, product_id: UUID, *, lock: bool = False) -> Pr
     return product
 
 
-def product_output(product: Product) -> ProductRead:
-    return ProductRead(
-        id=product.id,
-        sku=product.sku,
-        name=product.name,
-        category_id=product.category_id,
-        default_supplier_id=product.default_supplier_id,
-        unit=product.unit,
-        min_stock=f"{product.min_stock:.3f}",
-        lead_time_days=product.lead_time_days,
-        unit_cost_vnd=f"{product.unit_cost_vnd:.2f}",
-        on_hand=f"{product.balance.on_hand:.3f}",
-        is_active=product.is_active,
-    )
-
-
 def create_product(session: Session, data: dict):
     validate_references(session, data)
     product = Product(**data)
@@ -94,3 +72,21 @@ def patch_product(session: Session, product_id: UUID, data: dict):
     commit_catalog(session)
     session.refresh(product)
     return product_output(product)
+
+
+def save_category(session: Session, data: dict, category_id: UUID | None = None) -> Category:
+    category = require_record(session, Category, category_id) if category_id else Category()
+    for key, value in data.items():
+        setattr(category, key, value)
+    session.add(category)
+    commit_catalog(session)
+    return category
+
+
+def save_supplier(session: Session, data: dict, supplier_id: UUID | None = None) -> Supplier:
+    supplier = require_record(session, Supplier, supplier_id) if supplier_id else Supplier()
+    for key, value in data.items():
+        setattr(supplier, key, value)
+    session.add(supplier)
+    commit_catalog(session)
+    return supplier
