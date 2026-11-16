@@ -58,8 +58,15 @@ def flow(date_from: date | None = None, date_to: date | None = None,
     ).join(Product, StockMovement.product_id == Product.id).where(
         StockMovement.occurred_at >= start, StockMovement.occurred_at < end,
         StockMovement.movement_type.in_(["IN", "OUT"]),
-    ).group_by(local_day, Product.unit).order_by(local_day, Product.unit))
+    ).group_by(local_day, Product.unit).order_by(local_day, Product.unit)).all()
+    totals = {unit: {"inbound": Decimal(0), "outbound": Decimal(0)}
+              for unit in ("PCS", "KG", "LITER")}
+    for row in rows:
+        totals[row.unit]["inbound"] += row.inbound
+        totals[row.unit]["outbound"] += row.outbound
     return {"items": [{"date": row.day, "unit": row.unit, "inbound": f"{row.inbound:.3f}",
                        "outbound": f"{row.outbound:.3f}"} for row in rows],
             "date_from": start_day, "date_to": end_day, "timezone": "Asia/Ho_Chi_Minh",
+            "totals": {unit: {key: f"{value:.3f}" for key, value in values.items()}
+                       for unit, values in totals.items()},
             "as_of": datetime.now(UTC)}

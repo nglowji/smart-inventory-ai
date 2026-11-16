@@ -17,5 +17,5 @@ export type Summary = {
   total_active_skus: number; low_stock_count: number; estimated_inventory_value_vnd: string
   movement_count: number; date_from: string; date_to: string; as_of: string
 }
-export type Flow = { items: { date: string; unit: string; inbound: string; outbound: string }[]; date_from: string; date_to: string }
+export type Flow = { items: { date: string; unit: string; inbound: string; outbound: string }[]; totals: Record<string, { inbound: string; outbound: string }>; date_from: string; date_to: string }
 export type Range = { date_from: string; date_to: string }
