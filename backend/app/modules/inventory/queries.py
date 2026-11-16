@@ -4,11 +4,15 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
-from app.core.dates import date_bounds
+from app.core.dates import history_bounds
 from app.db.models import Product, StockBalance, StockMovement, User
 from app.db.pagination import paginate
 from app.modules.catalog.serializers import product_output
 from app.modules.inventory.serializers import movement_output
+
+
+def find_movement_by_key(session: Session, key: UUID) -> StockMovement | None:
+    return session.scalar(select(StockMovement).where(StockMovement.idempotency_key == str(key)))
 
 
 def list_balances(
@@ -64,11 +68,11 @@ def list_movements(
         statement = statement.where(StockMovement.movement_type == movement_type)
     if actor_id:
         statement = statement.where(StockMovement.actor_id == actor_id)
-    if date_from or date_to:
-        start, end = date_bounds(date_from or date_to, date_to or date_from)
-        statement = statement.where(
-            StockMovement.occurred_at >= start, StockMovement.occurred_at < end
-        )
+    start, end = history_bounds(date_from, date_to)
+    if start is not None:
+        statement = statement.where(StockMovement.occurred_at >= start)
+    if end is not None:
+        statement = statement.where(StockMovement.occurred_at < end)
     total = session.scalar(select(func.count()).select_from(statement.subquery()))
     rows = session.execute(
         statement.order_by(StockMovement.occurred_at.desc(), StockMovement.id.desc())

@@ -271,6 +271,8 @@ def test_migration_downgrade_and_upgrade(catalog_db):
         assert "products" not in inspect(connection).get_table_names()
         command.upgrade(migration_config(connection), "head")
         command.check(migration_config(connection))
+        checks = inspect(connection).get_check_constraints("stock_movements")
+        assert "ck_stock_movements_balance_delta" in {check["name"] for check in checks}
         assert {"products", "stock_balances", "categories", "suppliers", "users"} <= set(
             inspect(connection).get_table_names()
         )

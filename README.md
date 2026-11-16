@@ -227,3 +227,65 @@ npm run build
 ```
 
 Chạy `npm run format` để chuẩn hóa định dạng. TypeScript bật strict, noUnusedLocals, noUnusedParameters, noUncheckedIndexedAccess và noFallthroughCasesInSwitch. CI chạy các kiểm tra trên cùng lint/test backend. Test frontend hiện bao phủ phiên đăng nhập cũ, hủy phân trang, lỗi upstream, patch FK, precision tiền, ngày Việt Nam và dữ liệu biểu đồ tách đơn vị.
+
+## Phase 2 — Stock Core: hoàn thiện và nghiệm thu
+
+Các API kho đã được xây khi nối dashboard. Đợt Phase 2 này rà soát theo BR-03…BR-13, BR-20 và TC-09…TC-19, tách policy thuần để test offline, bổ sung kiểm thử còn thiếu và thêm migration `0002` bảo vệ số dư giao dịch ở DB.
+
+### Chức năng được nghiệm thu
+
+| Nhóm | Hành vi |
+|---|---|
+| Nhập | IN tăng balance, ghi quantity và số dư trước/sau, supplier tùy chọn |
+| Xuất | OUT cần lý do; thiếu tồn trả 409 và không ghi giao dịch |
+| Điều chỉnh | ADJUST_IN/OUT chỉ Admin, lý do ít nhất 10 ký tự; giảm không vượt tồn |
+| Số lượng | Decimal, dương, tối đa 3 số thập phân; PCS phải nguyên |
+| Đồng thời | Khóa product rồi balance trong cùng transaction, không âm kho |
+| Retry | Cùng key/nội dung/actor trả movement cũ; khác nội dung hoặc actor trả 409 |
+| Archive | Không tạo movement mới; retry giao dịch cũ vẫn trả lại kết quả cũ |
+| Lịch sử | Lọc SKU, loại, actor và ngày, phân trang; không sửa/xóa posted movement |
+| Chống giả mạo | Client không được truyền actor_id, stock_before, stock_after hoặc on_hand |
+| Tính nguyên tử | INSERT movement lỗi thì UPDATE balance rollback cùng transaction |
+
+Khi chỉ truyền `date_from`, lịch sử lọc từ đầu ngày Việt Nam đó trở đi; chỉ `date_to` thì lọc tới hết ngày đó. Truyền cả hai giới hạn tối đa 366 ngày. Dashboard tiếp tục dùng khoảng ngày có đủ hai đầu.
+
+### Code mới cần hiểu
+
+- `inventory/policies.py`: quyền ghi, quy tắc quantity và phép cộng/trừ tồn; không phụ thuộc HTTP hoặc SQLAlchemy.
+- `inventory/idempotency.py`: fingerprint từ payload đã chuẩn hóa và actor. `5` và `5.000` có cùng ý nghĩa; actor khác không thể nhận lại giao dịch của nhau bằng cùng key.
+- `inventory/service.py`: điều phối kiểm tra key, lock, policy, cập nhật balance, ghi movement và commit/rollback.
+- `inventory/queries.py`: tra cứu key và đọc tồn/lịch sử; ranh giới ngày nằm ở `core/dates.py`.
+- `alembic/versions/0002_movement_balance_delta.py`: CHECK bảo đảm IN/ADJUST_IN có after = before + quantity và OUT/ADJUST_OUT có after = before − quantity. Migration không tự tạo sản phẩm hay giao dịch.
+
+**What:** Một giao dịch kho là hai thay đổi đi cùng nhau: số dư mới và một bản ghi lịch sử. Không được lưu một phần.
+
+**Why:** Transaction chống lưu nửa chừng; row lock chống hai request cùng tính từ một số dư cũ; idempotency chống một thao tác bị ghi hai lần do retry. Ba cơ chế xử lý ba vấn đề khác nhau và đều cần thiết.
+
+**How:** Request có JWT → nhận actor từ token → kiểm tra role và key → khóa product → kiểm tra key lại sau khi chờ lock → khóa balance bằng SELECT FOR UPDATE → tính bằng Decimal → UPDATE balance + INSERT movement → COMMIT. UNIQUE constraint xử lý cả trường hợp hai sản phẩm khác nhau cạnh tranh cùng key; transaction thua phải rollback rồi tra lại movement đã ghi.
+
+Ví dụ: tồn 10, hai request OUT 8. Request đầu khóa và ghi tồn 2. Request sau đọc lại tồn 2 sau khi chờ, nên nhận 409. Nếu request sau là retry cùng key, nó trả movement cũ mà không xuất thêm. Nếu INSERT movement thất bại, tồn quay lại giá trị trước request.
+
+**Trade-offs:** Đây là khóa bi quan, request cùng SKU có thể phải chờ nhau. Với một kho nhỏ, sự rõ ràng và tính đúng đắn quan trọng hơn tối đa throughput. Giữ transaction ngắn, cùng thứ tự lock và không gọi LLM/network ngoài trong khi giữ khóa. Balance giúp đọc nhanh; movement giữ lịch sử truy vết. CHECK ở DB bổ sung bảo vệ nếu code ghi snapshot sai, không thay thế kiểm tra nghiệp vụ.
+
+**Đối chiếu EF Core:** Session gần DbContext; commit gần SaveChanges trong transaction. SELECT FOR UPDATE là khóa bi quan của PostgreSQL, khác optimistic concurrency dùng rowversion/concurrency token: optimistic phát hiện xung đột khi ghi rồi yêu cầu xử lý lại, còn cách hiện tại chờ khóa trước khi đọc/tính tồn.
+
+### Chạy và kiểm thử Phase 2
+
+```powershell
+# Từ thư mục gốc, áp dụng migration mới.
+.\.venv\Scripts\python.exe -m alembic -c backend/alembic.ini upgrade head
+.\.venv\Scripts\python.exe -m alembic -c backend/alembic.ini check
+.\.venv\Scripts\python.exe -m ruff check backend
+
+# Unit tests policy/idempotency không cần DB hoặc network.
+.\.venv\Scripts\python.exe -m pytest backend/tests/test_inventory_policies.py -q
+
+# Database test riêng phải được tạo như hướng dẫn ở trên.
+$env:TEST_DATABASE_URL = 'postgresql+psycopg://inventory:local-dev-only@127.0.0.1:5432/inventory_test'
+.\.venv\Scripts\python.exe -m pytest backend/tests -q
+Remove-Item Env:TEST_DATABASE_URL
+```
+
+Thử trên UI: thêm SKU PCS → Nhập 30 → Xuất 18 với lý do → kiểm tra tồn 12 và history 0→30→12 → thử xuất 13 để thấy lỗi thiếu tồn. Những bước này dùng dữ liệu bạn chủ động nhập; automated tests luôn chạy trong schema test riêng.
+
+Điểm dừng sau Phase 2: nghiệm thu Stock Core trước khi tiếp tục hoàn thiện Phase 3 (auth, audit và báo cáo). Mật khẩu Admin local được đồng bộ giữa DB và .env; không lưu mật khẩu thực trong README hoặc Git.

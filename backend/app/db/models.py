@@ -100,6 +100,11 @@ class StockMovement(Base):
         CheckConstraint("movement_type IN ('IN','OUT','ADJUST_IN','ADJUST_OUT')", name="type"),
         CheckConstraint("quantity > 0", name="quantity"),
         CheckConstraint("stock_before >= 0 AND stock_after >= 0", name="nonnegative"),
+        CheckConstraint(
+            "(movement_type IN ('IN','ADJUST_IN') AND stock_after = stock_before + quantity) "
+            "OR (movement_type IN ('OUT','ADJUST_OUT') AND stock_after = stock_before - quantity)",
+            name="balance_delta",
+        ),
         Index("ix_movements_product_date", "product_id", "occurred_at", "id"),
         Index("ix_movements_type_date", "movement_type", "occurred_at"),
     )

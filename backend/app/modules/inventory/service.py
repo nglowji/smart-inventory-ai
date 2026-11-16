@@ -1,7 +1,4 @@
-import hashlib
-import json
 from datetime import UTC, datetime
-from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import select
@@ -10,6 +7,13 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import DomainError
 from app.db.models import Product, StockBalance, StockMovement, Supplier, User
+from app.modules.inventory.idempotency import request_fingerprint
+from app.modules.inventory.policies import (
+    require_movement_permission,
+    stock_after,
+    validate_quantity,
+)
+from app.modules.inventory.queries import find_movement_by_key
 from app.modules.inventory.schemas import MovementCreate
 from app.modules.inventory.serializers import movement_output
 
@@ -23,17 +27,9 @@ def replay(session: Session, existing: StockMovement, fingerprint: str):
 
 
 def post_movement(session: Session, user: User, payload: MovementCreate, key: UUID):
-    if user.role == "VIEWER" or (
-        payload.movement_type.startswith("ADJUST") and user.role != "ADMIN"
-    ):
-        raise DomainError(403, "FORBIDDEN", "Bạn không có quyền tạo loại giao dịch này.")
-    data = payload.model_dump(mode="json")
-    data["quantity"] = f"{payload.quantity:.3f}"
-    data["actor_id"] = str(user.id)
-    fingerprint = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
-    existing = session.scalar(
-        select(StockMovement).where(StockMovement.idempotency_key == str(key))
-    )
+    require_movement_permission(user.role, payload.movement_type)
+    fingerprint = request_fingerprint(payload, user.id)
+    existing = find_movement_by_key(session, key)
     if existing:
         return replay(session, existing, fingerprint)
 
@@ -44,15 +40,12 @@ def post_movement(session: Session, user: User, payload: MovementCreate, key: UU
     if product is None:
         raise DomainError(404, "PRODUCT_NOT_FOUND", "Không tìm thấy sản phẩm.")
     # A retry may have been waiting for this product while the first request committed.
-    existing = session.scalar(
-        select(StockMovement).where(StockMovement.idempotency_key == str(key))
-    )
+    existing = find_movement_by_key(session, key)
     if existing:
         return replay(session, existing, fingerprint)
     if not product.is_active:
         raise DomainError(409, "PRODUCT_ARCHIVED", "Sản phẩm đã ngừng hoạt động.")
-    if product.unit == "PCS" and payload.quantity != payload.quantity.to_integral_value():
-        raise DomainError(422, "INVALID_QUANTITY_UNIT", "Đơn vị PCS chỉ nhận số lượng nguyên.")
+    validate_quantity(payload.quantity, product.unit)
     if payload.supplier_id:
         supplier = session.get(Supplier, payload.supplier_id)
         if supplier is None or not supplier.is_active:
@@ -64,12 +57,8 @@ def post_movement(session: Session, user: User, payload: MovementCreate, key: UU
         raise DomainError(
             409, "BALANCE_MISSING", "Sản phẩm thiếu dòng tồn kho, cần kiểm tra dữ liệu."
         )
-    delta = payload.quantity if payload.movement_type in ("IN", "ADJUST_IN") else -payload.quantity
-    before, after = balance.on_hand, balance.on_hand + delta
-    if after < 0:
-        raise DomainError(409, "INSUFFICIENT_STOCK", "Tồn kho không đủ để xuất số lượng yêu cầu.")
-    if after > Decimal("99999999999.999"):
-        raise DomainError(422, "INVALID_QUANTITY", "Tồn kho vượt giới hạn lưu trữ.")
+    before = balance.on_hand
+    after = stock_after(before, payload.quantity, payload.movement_type)
     movement = StockMovement(
         **payload.model_dump(),
         actor_id=user.id,
@@ -89,9 +78,7 @@ def post_movement(session: Session, user: User, payload: MovementCreate, key: UU
         if constraint != "uq_stock_movements_idempotency_key":
             raise
         # A concurrent retry won the key; the failed transaction's balance change rolled back.
-        existing = session.scalar(
-            select(StockMovement).where(StockMovement.idempotency_key == str(key))
-        )
+        existing = find_movement_by_key(session, key)
         if existing is None:
             raise
         return replay(session, existing, fingerprint)
