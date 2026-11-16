@@ -135,9 +135,9 @@ Nếu hai request OUT 8 từ tồn 10, request thứ hai chờ khóa. Khi đư�
 | backend/app/modules/inventory/ | Lock, idempotency, transaction, lịch sử | Service + database transaction |
 | backend/app/modules/reporting/ | SQL aggregates cho dashboard | LINQ GroupBy / projection / SUM |
 | backend/app/modules/auth/ | Login, JWT, role dependencies, seed | Authentication + authorization policies |
-| frontend/src/api.ts | HTTP client, JWT, timeout, lỗi | HttpClient + delegating handler |
-| frontend/src/screens/ | Màn hình dashboard, Catalog, lịch sử | Razor/Blazor pages/components |
-| frontend/src/components/Dialog.tsx | Form lưu thật và key retry | EditForm + validation/service call |
+| frontend/src/shared/api/ | HTTP client, session, timeout, lỗi và phân trang | HttpClient + delegating handler |
+| frontend/src/features/ | Màn hình, form và API theo tính năng | Razor/Blazor components theo feature |
+| frontend/src/features/operations/ | Chọn form nghiệp vụ cần mở | Điều phối các component nhập liệu |
 
 Pydantic DTO là hợp đồng HTTP, không phải entity database. DTO không nhận on_hand, actor_id hay stock_before/after từ client. TypeScript giúp kiểm tra kiểu lúc build, không thay thế validation backend. Alembic migration phải chạy để sửa schema; sửa class Python không tự sửa DB. Auth có JWT không thay thế kiểm tra role.
 
@@ -150,3 +150,80 @@ Chưa có AI Assistant, UI quản trị tài khoản, audit logs tổng quát, r
 Compose hiện chỉ chạy PostgreSQL; backend/frontend chạy local. Vite proxy là cấu hình dev. Readiness cần bảo vệ khi triển khai công khai. Dependencies frontend có lockfile; Python hiện dùng khoảng phiên bản.
 
 Theo yêu cầu repository, chỉ README.md được đưa lên Git trong các file Markdown; đặc tả gốc và bộ skill giữ local. .env và các secrets không commit. Mỗi đợt triển khai đều có giải thích What → Why → How → Trade-offs → đối chiếu .NET.
+
+## Cấu trúc và quy ước clean code
+
+Frontend tổ chức theo tính năng, dùng lớp app để ghép màn hình và shared cho phần thật sự dùng chung:
+
+```text
+frontend/src/
+  main.tsx                       # Bootstrap React và font/style
+  app/
+    App.tsx                      # Cổng xác thực
+    Workspace.tsx                # Điều phối màn hình, thao tác, refresh
+    navigation.ts                # Screen ID có type, nhãn, quyền nút chính
+    components/                  # Sidebar, Topbar, PageHeader, ReportPeriod
+  features/
+    auth/                        # Đăng nhập, useAuth, API xác thực
+    catalog/                     # Products, MasterData, form và API Catalog
+    inventory/                   # Giao dịch, lịch sử, bảng, API và tên loại giao dịch
+    dashboard/                   # Dashboard, chart và adapter dữ liệu biểu đồ
+    operations/                  # Action union và bộ chọn form theo action
+  shared/
+    api/                         # Client HTTP, lỗi, session, query và pagination
+    hooks/                       # useResource, useDebouncedValue
+    ui/                          # Modal, feedback, pagination, icon
+    lib/                         # Định dạng, ngày, CSV và đọc FormData
+    styles/                      # Tokens, base, layout, components, forms, responsive
+    contracts.ts                 # DTO và các union type dùng xuyên tính năng
+```
+
+Backend giữ cấu trúc module; mỗi file có một vai trò rõ:
+
+```text
+backend/app/
+  main.py                        # Composition root, kết nối routers
+  core/                          # Config, lỗi, thời gian và schema Page chung
+  db/                            # Models, connection, session, pagination SQL
+  modules/<feature>/
+    api.py                       # HTTP route, quyền, parse request, response model
+    schemas.py                   # Hợp đồng request/response Pydantic
+    queries.py                   # Truy vấn đọc SQLAlchemy
+    service.py                   # Nghiệp vụ ghi, transaction và commit
+    serializers.py               # Chuyển entity thành dữ liệu trả ra
+```
+
+Không bắt buộc tạo đủ mọi file cho mọi feature: chỉ tách khi có trách nhiệm thực tế. Chưa thêm generic repository, mediator, CQRS hay interface không có nhu cầu.
+
+**What:** App chỉ điều phối; feature chứa nghiệp vụ giao diện; shared cung cấp hạ tầng. Router backend không còn tự dựng SQL.
+
+**Why:** Sửa form sản phẩm không phải đọc logic đăng nhập/giao dịch; thay cách gọi API không phải sửa từng bảng; quy tắc hủy request được kiểm soát ở một chỗ.
+
+**How:** Component gọi API của feature → HTTP client chung → backend router → query/service → database. `useResource` quản lý loading/success/error và hủy request khi rời màn hình. Sau khi hủy, kết quả cũ không được cập nhật state. Request 401 cũ cũng không được xóa token của phiên đăng nhập mới.
+
+Mỗi form có component riêng. `FormModal` chỉ quản lý mở/đóng, trạng thái lưu và hiển thị lỗi; không chứa quy tắc sản phẩm hay giao dịch. `MovementForm` sở hữu key retry; `ProductForm` gửi patch có type và chỉ gồm trường thay đổi.
+
+**Trade-offs:** Có thêm file nhưng ít trách nhiệm trong mỗi file. Giữ DTO tại contracts chung và dùng hàm API đơn giản để tránh tạo lớp abstraction thừa. Kiểm tra TypeScript không thay thế validation HTTP; backend response models tiếp tục bảo vệ hợp đồng trả về.
+
+**Đối chiếu .NET:** `App` gần composition root; API feature gần typed HttpClient; hook gần logic trạng thái dùng lại của component; schema gần DTO. Backend `api.py` gần Controller, `service.py` gần Application Service, `queries.py` gần truy vấn projection EF Core. Transaction nhập/xuất vẫn nằm trong inventory service.
+
+Quy tắc bắt buộc cho thay đổi tiếp theo:
+
+- Shared không import ngược app/features. Component feature không gọi HTTP client trực tiếp mà đi qua `api.ts` của feature; ESLint kiểm tra các ranh giới này.
+- Screen ID, role, đơn vị và loại giao dịch dùng union type; không dùng chuỗi tùy ý hoặc `any` để né lỗi.
+- React hooks phải đúng thứ tự và đủ dependencies. Request tải dữ liệu có AbortSignal, timeout và xử lý lỗi.
+- Backend core/db không phụ thuộc feature. Router không chứa SQL; service/query/serializer không import router hoặc FastAPI. Test kiến trúc kiểm tra các quy tắc này.
+- Không đổi response field, quyền, transaction, cách tính Decimal hay idempotency khi chỉ refactor cấu trúc.
+- Tiền và số lượng trong payload giữ dạng chuỗi decimal. Thay đổi nội dung form không được vô tình gửi lại các FK không đổi.
+- Không sửa migration đã áp dụng chỉ để làm đẹp code. Thay đổi schema phải có migration mới.
+
+Kiểm tra frontend từ thư mục frontend:
+
+```powershell
+npm run lint
+npm run format:check
+npm run test
+npm run build
+```
+
+Chạy `npm run format` để chuẩn hóa định dạng. TypeScript bật strict, noUnusedLocals, noUnusedParameters, noUncheckedIndexedAccess và noFallthroughCasesInSwitch. CI chạy các kiểm tra trên cùng lint/test backend. Test frontend hiện bao phủ phiên đăng nhập cũ, hủy phân trang, lỗi upstream, patch FK, precision tiền, ngày Việt Nam và dữ liệu biểu đồ tách đơn vị.

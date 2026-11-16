@@ -1,7 +1,7 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 import type { Range } from "../../shared/contracts";
-import { isValidRange, rangeFor } from "../../shared/lib/dates";
+import { isValidRange, presetFor, rangeFor } from "../../shared/lib/dates";
 import Icon from "../../shared/ui/Icon";
 
 export default function ReportPeriod({
@@ -12,7 +12,7 @@ export default function ReportPeriod({
   onChange: (range: Range) => void;
 }) {
   const [draft, setDraft] = useState(range);
-  const [preset, setPreset] = useState("30");
+  const [preset, setPreset] = useState(() => presetFor(range));
   const [rangeError, setRangeError] = useState("");
   function applyDates(event: FormEvent) {
     event.preventDefault();

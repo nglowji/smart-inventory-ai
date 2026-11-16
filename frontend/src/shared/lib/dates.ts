@@ -12,3 +12,11 @@ export function isValidRange(range: Range): boolean {
   const difference = (Date.parse(range.date_to) - Date.parse(range.date_from)) / DAY_MS;
   return Number.isFinite(difference) && difference >= 0 && difference <= 365;
 }
+
+export function presetFor(range: Range, now = new Date()): string {
+  const days = [7, 30, 90].find((count) => {
+    const preset = rangeFor(count, now);
+    return preset.date_from === range.date_from && preset.date_to === range.date_to;
+  });
+  return days === undefined ? "custom" : String(days);
+}
