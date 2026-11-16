@@ -28,3 +28,10 @@ coverage/
 .DS_Store
 Thumbs.db
 *.log
+
+# Python development artifacts
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
