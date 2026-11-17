@@ -7,6 +7,28 @@ export type User = {
   email: string;
   role: Role;
 };
+
+export type ManagedUser = User & { is_active: boolean; created_at: string };
+export type AuditEvent =
+  | "LOGIN_FAILED"
+  | "LOGIN_SUCCESS"
+  | "USER_CREATED"
+  | "USER_UPDATED"
+  | "USER_PASSWORD_RESET"
+  | "PASSWORD_CHANGED"
+  | "PRODUCT_ARCHIVED"
+  | "STOCK_ADJUSTED";
+export type AuditEntry = {
+  id: string;
+  actor_id: string | null;
+  actor_email: string | null;
+  event_type: AuditEvent;
+  target_type: string;
+  target_id: string | null;
+  details: Record<string, string | boolean>;
+  request_id: string | null;
+  created_at: string;
+};
 export type Product = {
   id: string;
   sku: string;

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "./client";
 import { ApiError } from "./errors";
 import { allPages } from "./pagination";
-import { getToken, SESSION_EXPIRED, setToken } from "./session";
+import { expireSession, getToken, SESSION_EXPIRED, setToken } from "./session";
 
 class MemoryStorage {
   private items = new Map<string, string>();
@@ -18,6 +18,17 @@ class MemoryStorage {
 }
 
 describe("HTTP session and cancellation boundaries", () => {
+  it("preserves the success notice when a password change ends the session", () => {
+    setToken("old-session");
+    let notice = "";
+    window.addEventListener(SESSION_EXPIRED, (event) => {
+      if (event instanceof CustomEvent && typeof event.detail === "string")
+        notice = event.detail;
+    });
+    expireSession("old-session", "Password changed; sign in again.");
+    expect(getToken()).toBeNull();
+    expect(notice).toBe("Password changed; sign in again.");
+  });
   const fetchMock = vi.fn<typeof fetch>();
   beforeEach(() => {
     fetchMock.mockReset();

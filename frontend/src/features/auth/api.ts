@@ -10,3 +10,12 @@ export const requestLogin = (credentials: Credentials, signal?: AbortSignal) =>
     body: JSON.stringify(credentials),
     signal,
   });
+
+export const changePassword = (payload: {
+  current_password: string;
+  new_password: string;
+}) =>
+  api<{ message: string }>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });

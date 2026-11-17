@@ -1,4 +1,7 @@
 const messages: Record<string, string> = {
+  LAST_ADMIN: "Phải giữ ít nhất một Admin đang hoạt động.",
+  EMAIL_ALREADY_EXISTS: "Email đã được sử dụng.",
+  CURRENT_PASSWORD_INVALID: "Mật khẩu hiện tại không đúng.",
   VALIDATION_ERROR: "Kiểm tra các trường bắt buộc, số lượng và định dạng dữ liệu.",
   SKU_ALREADY_EXISTS: "Mã SKU đã tồn tại, kể cả sản phẩm đã ngừng hoạt động.",
   UNIT_IMMUTABLE: "Sản phẩm đã có giao dịch. Bạn không thể thay đổi đơn vị.",

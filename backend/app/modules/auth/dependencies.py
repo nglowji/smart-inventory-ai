@@ -25,14 +25,20 @@ def current_user(
             credentials.credentials,
             signing_key(request.app.state.settings),
             algorithms=["HS256"],
-            options={"require": ["sub", "iat", "exp"]},
+            options={"require": ["sub", "iat", "exp", "ver"]},
         )
         user_id = UUID(claims["sub"])
     except (jwt.PyJWTError, ValueError, TypeError):
         raise DomainError(401, "UNAUTHORIZED", "Phiên đăng nhập không hợp lệ.") from None
     user = session.get(User, user_id)
-    if user is None or not user.is_active:
+    if (
+        user is None
+        or not user.is_active
+        or type(claims["ver"]) is not int
+        or user.auth_version != claims["ver"]
+    ):
         raise DomainError(401, "UNAUTHORIZED", "Phiên đăng nhập không hợp lệ.")
+    request.state.actor_id = str(user.id)
     return user
 
 

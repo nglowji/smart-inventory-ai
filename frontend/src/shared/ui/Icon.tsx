@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 
 type Name =
+  | "users"
+  | "audit"
+  | "key"
   | "overview"
   | "box"
   | "list"
@@ -19,6 +22,24 @@ type Name =
   | "alert"
   | "check";
 const paths: Record<Name, ReactNode> = {
+  users: (
+    <>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3 21v-3a6 6 0 0 1 12 0v3M16 5a3 3 0 0 1 0 6M18 15a5 5 0 0 1 3 4v2" />
+    </>
+  ),
+  audit: (
+    <>
+      <path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6Z" />
+      <path d="m8 12 3 3 5-6" />
+    </>
+  ),
+  key: (
+    <>
+      <circle cx="8" cy="8" r="5" />
+      <path d="m12 12 9 9M17 17l3-3M14 14l2-2" />
+    </>
+  ),
   overview: (
     <>
       <rect x="3" y="3" width="7" height="7" rx="1" />

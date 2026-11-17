@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.errors import DomainError
 from app.db.models import Category, Product, StockBalance, StockMovement, Supplier
+from app.modules.audit.service import record_event
 from app.modules.catalog.serializers import product_output
 
 
@@ -60,8 +61,9 @@ def create_product(session: Session, data: dict):
     return product_output(product)
 
 
-def patch_product(session: Session, product_id: UUID, data: dict):
+def patch_product(session: Session, product_id: UUID, data: dict, actor_id: UUID | None = None):
     product = get_product(session, product_id, lock=True)
+    was_active = product.is_active
     validate_references(session, data)
     if "unit" in data and data["unit"] != product.unit:
         has_history = session.scalar(select(exists().where(StockMovement.product_id == product_id)))
@@ -69,6 +71,15 @@ def patch_product(session: Session, product_id: UUID, data: dict):
             raise DomainError(409, "UNIT_IMMUTABLE", "Không đổi đơn vị khi đã có giao dịch kho.")
     for key, value in data.items():
         setattr(product, key, value)
+    if was_active and not product.is_active:
+        record_event(
+            session,
+            "PRODUCT_ARCHIVED",
+            actor_id=actor_id,
+            target_type="product",
+            target_id=product.id,
+            details={"sku": product.sku},
+        )
     commit_catalog(session)
     session.refresh(product)
     return product_output(product)

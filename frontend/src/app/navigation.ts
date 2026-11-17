@@ -32,20 +32,29 @@ export const navigation = [
     icon: "activity",
     description: "Theo dõi từng lần nhập, xuất và điều chỉnh tồn kho.",
   },
+  {
+    id: "users",
+    label: "Tài khoản",
+    icon: "users",
+    description: "Quản lý người dùng, vai trò và trạng thái truy cập.",
+  },
+  {
+    id: "audit",
+    label: "Nhật ký",
+    icon: "audit",
+    description: "Truy vết thao tác quan trọng theo người dùng và thời gian.",
+  },
 ] as const;
 export type ScreenId = (typeof navigation)[number]["id"];
 export type Navigate = (screen: ScreenId, low?: boolean) => void;
-export const roleLabels = {
-  ADMIN: "Quản trị viên",
-  STAFF: "Nhân viên kho",
-  VIEWER: "Chỉ xem",
-} as const;
 export const actionLabels = {
   product: "Thêm sản phẩm",
   category: "Thêm danh mục",
   supplier: "Thêm nhà cung cấp",
   movement: "Tạo giao dịch",
   archive: "Ngừng hoạt động",
+  account: "Thêm tài khoản",
+  password: "Đổi mật khẩu",
 } as const;
 
 export function screenDetails(screen: ScreenId) {
@@ -58,8 +67,13 @@ export function primaryActionFor(screen: ScreenId, user: User): Action | null {
     if (screen === "categories") return { kind: "category" };
     if (screen === "suppliers") return { kind: "supplier" };
     if (screen === "products") return { kind: "product" };
+    if (screen === "users") return { kind: "account" };
   }
   if (user.role !== "VIEWER" && (screen === "dashboard" || screen === "movements"))
     return { kind: "movement" };
   return null;
+}
+
+export function canAccessScreen(screen: ScreenId, user: User): boolean {
+  return (screen !== "users" && screen !== "audit") || user.role === "ADMIN";
 }

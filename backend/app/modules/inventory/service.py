@@ -1,5 +1,5 @@
 from datetime import UTC, datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import DomainError
 from app.db.models import Product, StockBalance, StockMovement, Supplier, User
+from app.modules.audit.service import record_event
 from app.modules.inventory.idempotency import request_fingerprint
 from app.modules.inventory.policies import (
     require_movement_permission,
@@ -61,6 +62,7 @@ def post_movement(session: Session, user: User, payload: MovementCreate, key: UU
     after = stock_after(before, payload.quantity, payload.movement_type)
     movement = StockMovement(
         **payload.model_dump(),
+        id=uuid4(),
         actor_id=user.id,
         stock_before=before,
         stock_after=after,
@@ -70,6 +72,19 @@ def post_movement(session: Session, user: User, payload: MovementCreate, key: UU
     balance.on_hand = after
     balance.updated_at = datetime.now(UTC)
     session.add(movement)
+    if payload.movement_type.startswith("ADJUST"):
+        record_event(
+            session,
+            "STOCK_ADJUSTED",
+            actor_id=user.id,
+            target_type="stock_movement",
+            target_id=movement.id,
+            details={
+                "product_id": str(product.id),
+                "movement_type": payload.movement_type,
+                "quantity": f"{payload.quantity:.3f}",
+            },
+        )
     try:
         session.commit()
     except IntegrityError as exc:

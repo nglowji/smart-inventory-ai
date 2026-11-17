@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.core.schemas import Page
+from app.db.models import User
 from app.db.session import get_session
 from app.modules.auth.dependencies import admin_user, current_user
 from app.modules.catalog import queries, service
@@ -109,5 +110,7 @@ def patch_product(
     response_model=dto.ProductRead,
     dependencies=[Depends(admin_user)],
 )
-def archive_product(product_id: UUID, session: Session = Depends(get_session)):
-    return service.patch_product(session, product_id, {"is_active": False})
+def archive_product(
+    product_id: UUID, user: User = Depends(admin_user), session: Session = Depends(get_session)
+):
+    return service.patch_product(session, product_id, {"is_active": False}, actor_id=user.id)

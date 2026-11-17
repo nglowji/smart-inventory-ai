@@ -3,17 +3,20 @@ import { MasterData } from "../features/catalog/MasterDataPage";
 import { Products } from "../features/catalog/ProductsPage";
 import Dashboard from "../features/dashboard/DashboardPage";
 import History from "../features/inventory/HistoryPage";
+import UsersPage from "../features/users/UsersPage";
+import AuditPage from "../features/audit/AuditPage";
 import OperationDialog from "../features/operations/OperationDialog";
 import type { Action } from "../features/operations/types";
 import type { Range, User } from "../shared/contracts";
 import { rangeFor } from "../shared/lib/dates";
+import { roleLabels } from "../shared/lib/roles";
 import Icon from "../shared/ui/Icon";
 import PageHeader from "./components/PageHeader";
 import ReportPeriod from "./components/ReportPeriod";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import type { ScreenId } from "./navigation";
-import { actionLabels, primaryActionFor, roleLabels, screenDetails } from "./navigation";
+import { actionLabels, primaryActionFor, screenDetails } from "./navigation";
 
 export default function Workspace({ user, logout }: { user: User; logout: () => void }) {
   const [screen, setScreen] = useState<ScreenId>("dashboard");
@@ -40,7 +43,7 @@ export default function Workspace({ user, logout }: { user: User; logout: () => 
   }
   const details = screenDetails(screen);
   const role = roleLabels[user.role];
-  const hasRange = screen === "dashboard" || screen === "movements";
+  const hasRange = screen === "dashboard" || screen === "movements" || screen === "audit";
   const primaryAction = primaryActionFor(screen, user);
   const actionLabel = primaryAction ? actionLabels[primaryAction.kind] : "";
 
@@ -62,6 +65,7 @@ export default function Workspace({ user, logout }: { user: User; logout: () => 
         mobile={mobile}
         navigate={navigate}
         logout={logout}
+        changePassword={() => setAction({ kind: "password" })}
       />
       <div className="workspace-content">
         <Topbar
@@ -125,6 +129,22 @@ export default function Workspace({ user, logout }: { user: User; logout: () => 
           )}
           {screen === "movements" && (
             <History
+              key={JSON.stringify(range)}
+              range={range}
+              version={version}
+              refresh={refresh}
+            />
+          )}
+          {screen === "users" && user.role === "ADMIN" && (
+            <UsersPage
+              version={version}
+              refresh={refresh}
+              currentUserId={user.id}
+              edit={(account) => setAction({ kind: "account", account })}
+            />
+          )}
+          {screen === "audit" && user.role === "ADMIN" && (
+            <AuditPage
               key={JSON.stringify(range)}
               range={range}
               version={version}

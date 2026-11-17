@@ -32,11 +32,15 @@ export function useAuth() {
           if (!controller.signal.aborted) setLoading(false);
         });
     } else setLoading(false);
-    const expired = () => {
+    const expired = (event: Event) => {
       generation.current += 1;
       setUser(null);
       setLoading(false);
-      setMessage("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+      setMessage(
+        event instanceof CustomEvent && typeof event.detail === "string"
+          ? event.detail
+          : "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+      );
     };
     window.addEventListener(SESSION_EXPIRED, expired);
     return () => {

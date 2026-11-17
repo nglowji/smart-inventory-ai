@@ -3,6 +3,8 @@ import ArchiveProductForm from "../catalog/ArchiveProductForm";
 import MasterDataForm from "../catalog/MasterDataForm";
 import ProductForm from "../catalog/ProductForm";
 import MovementForm from "../inventory/MovementForm";
+import UserForm from "../users/UserForm";
+import PasswordForm from "../auth/PasswordForm";
 import type { Action, OperationCallbacks } from "./types";
 
 export default function OperationDialog({
@@ -13,6 +15,10 @@ export default function OperationDialog({
 }: OperationCallbacks & { action: Action; user: User }) {
   const callbacks = { close, saved };
   switch (action.kind) {
+    case "account":
+      return <UserForm account={action.account} {...callbacks} />;
+    case "password":
+      return <PasswordForm {...callbacks} />;
     case "product":
       return <ProductForm product={action.product} {...callbacks} />;
     case "archive":

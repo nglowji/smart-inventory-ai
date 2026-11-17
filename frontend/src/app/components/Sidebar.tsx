@@ -1,7 +1,8 @@
 import type { User } from "../../shared/contracts";
 import Icon from "../../shared/ui/Icon";
+import { roleLabels } from "../../shared/lib/roles";
 import type { Navigate, ScreenId } from "../navigation";
-import { navigation, roleLabels } from "../navigation";
+import { canAccessScreen, navigation } from "../navigation";
 
 export default function Sidebar({
   user,
@@ -9,12 +10,14 @@ export default function Sidebar({
   mobile,
   navigate,
   logout,
+  changePassword,
 }: {
   user: User;
   screen: ScreenId;
   mobile: boolean;
   navigate: Navigate;
   logout: () => void;
+  changePassword: () => void;
 }) {
   const role = roleLabels[user.role];
   return (
@@ -34,18 +37,20 @@ export default function Sidebar({
       </div>
       <p className="nav-label">VẬN HÀNH</p>
       <nav aria-label="Điều hướng chính">
-        {navigation.map((item) => (
-          <button
-            className={`nav-item ${screen === item.id ? "active" : ""}`}
-            aria-current={screen === item.id ? "page" : undefined}
-            key={item.label}
-            onClick={() => navigate(item.id)}
-          >
-            <Icon name={item.icon} size={19} />
-            <span>{item.label}</span>
-            {screen === item.id && <span className="nav-active-dot" />}
-          </button>
-        ))}
+        {navigation
+          .filter((item) => canAccessScreen(item.id, user))
+          .map((item) => (
+            <button
+              className={`nav-item ${screen === item.id ? "active" : ""}`}
+              aria-current={screen === item.id ? "page" : undefined}
+              key={item.label}
+              onClick={() => navigate(item.id)}
+            >
+              <Icon name={item.icon} size={19} />
+              <span>{item.label}</span>
+              {screen === item.id && <span className="nav-active-dot" />}
+            </button>
+          ))}
       </nav>
       <div className="sidebar-note">
         <Icon name="check" size={17} />
@@ -60,6 +65,14 @@ export default function Sidebar({
           <strong title={user.email}>{user.email}</strong>
           <span>{role}</span>
         </div>
+        <button
+          className="icon-button"
+          onClick={changePassword}
+          aria-label="Đổi mật khẩu cá nhân"
+          title="Đổi mật khẩu"
+        >
+          <Icon name="key" size={17} />
+        </button>
         <button
           className="icon-button"
           onClick={logout}
