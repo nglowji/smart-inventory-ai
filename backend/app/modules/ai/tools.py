@@ -1,4 +1,4 @@
-"""Six bounded read-only tools. No user-supplied SQL, identities or write functions."""
+"""Bounded read-only tools. No user-supplied SQL, identities or write functions."""
 
 import json
 from datetime import timedelta
@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session
 from app.core.dates import date_bounds
 from app.core.errors import DomainError
 from app.db.models import Product, StockBalance, StockMovement
+from app.modules.ai.detail_tools import DETAIL_TOOLS
+from app.modules.ai.tool_queries import STOCK, contains_text, encode_row, stock_row
 from app.modules.ai.policies import replenishment
 from app.modules.ai.schemas import (
     LimitArgs,
@@ -19,46 +21,16 @@ from app.modules.ai.schemas import (
     SkuArgs,
 )
 
-STOCK_COLUMNS = (
-    Product.sku,
-    Product.name,
-    Product.unit,
-    Product.is_active,
-    Product.min_stock,
-    Product.lead_time_days,
-    StockBalance.on_hand,
-)
-STOCK = select(*STOCK_COLUMNS).join(StockBalance, StockBalance.product_id == Product.id)
-
-
-def stock_row(session, sku):
-    return session.execute(STOCK.where(Product.sku == sku)).mappings().first()
-
-
-def encode_row(row):
-    return {
-        key: str(value)
-        if key in {"on_hand", "min_stock", "quantity", "outbound"}
-        else value.isoformat()
-        if key == "occurred_at"
-        else value
-        for key, value in row.items()
-    }
-
-
 def get_stock(session, args, now):
     row = stock_row(session, args.sku)
     return encode_row(row) if row else {"sku": args.sku, "found": False}
 
 
 def search(session, args, now):
-    # Bound parameters and escaped LIKE wildcards keep search literal.
-    escaped = args.query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-    pattern = f"%{escaped}%"
     rows = (
         session.execute(
             STOCK.where(
-                Product.sku.ilike(pattern, escape="\\") | Product.name.ilike(pattern, escape="\\")
+                contains_text(Product.sku, args.query) | contains_text(Product.name, args.query)
             )
             .order_by(Product.sku)
             .limit(args.limit + 1)
@@ -191,6 +163,7 @@ def recommend(session, args, now):
 
 
 REGISTRY = {
+    **DETAIL_TOOLS,
     "get_stock_by_sku": (
         SkuArgs,
         get_stock,

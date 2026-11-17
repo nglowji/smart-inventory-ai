@@ -102,7 +102,7 @@ def movement_activity(session: Session, start, end):
     )
 
 
-def top_outbound(session: Session, start, end):
+def top_outbound(session: Session, start, end, *, limit: int = 5):
     totals = (
         select(
             Product.id.label("product_id"),
@@ -128,7 +128,7 @@ def top_outbound(session: Session, start, end):
     ).cte("outbound_ranked")
     rows = (
         session.execute(
-            select(ranked).where(ranked.c.rank <= 5).order_by(ranked.c.unit, ranked.c.rank)
+            select(ranked).where(ranked.c.rank <= limit).order_by(ranked.c.unit, ranked.c.rank)
         )
         .mappings()
         .all()
