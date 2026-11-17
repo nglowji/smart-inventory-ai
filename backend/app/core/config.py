@@ -21,18 +21,21 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:5173"]
     jwt_secret: SecretStr | None = Field(default=None, min_length=32)
     access_token_minutes: int = Field(default=30, ge=1, le=120)
-    ai_provider: Literal["disabled", "openai", "mock"] = "disabled"
+    ai_provider: Literal["disabled", "openai", "gemini", "mock"] = "disabled"
     ai_model: str = Field(default="", max_length=100)
     ai_api_key: SecretStr | None = None
-    ai_base_url: str = "https://api.openai.com/v1"
+    gemini_api_key: SecretStr | None = None
+    ai_base_url: str | None = None
     ai_timeout_seconds: int = Field(default=12, ge=1, le=20)
     ai_requests_per_minute: int = Field(default=6, ge=1, le=30)
 
     @field_validator("ai_base_url")
     @classmethod
-    def validate_ai_url(cls, value: str) -> str:
+    def validate_ai_url(cls, value: str | None) -> str | None:
         from urllib.parse import urlsplit
 
+        if not value or not value.strip():
+            return None
         parsed = urlsplit(value)
         local = parsed.hostname in {"localhost", "127.0.0.1", "::1"}
         if (
@@ -45,6 +48,14 @@ class Settings(BaseSettings):
         ):
             raise ValueError("AI_BASE_URL must use HTTPS (HTTP allowed only on loopback)")
         return value.rstrip("/")
+
+    @property
+    def ai_endpoint(self) -> str:
+        if self.ai_base_url:
+            return self.ai_base_url
+        if self.ai_provider == "gemini":
+            return "https://generativelanguage.googleapis.com/v1beta"
+        return "https://api.openai.com/v1"
 
     @field_validator("database_url")
     @classmethod

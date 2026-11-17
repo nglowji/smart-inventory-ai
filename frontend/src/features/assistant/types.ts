@@ -1,6 +1,6 @@
 export type AiStatus = {
   available: boolean;
-  mode: "disabled" | "openai" | "mock";
+  mode: "disabled" | "openai" | "gemini" | "mock";
   message: string;
 };
 export type Conversation = {

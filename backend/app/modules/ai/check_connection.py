@@ -14,7 +14,9 @@ from app.modules.ai.tools import REGISTRY
 def check_connection(settings: Settings) -> dict:
     if settings.ai_provider == "mock":
         raise DomainError(
-            503, "AI_TEST_MODE", "Mock mode không xác nhận kết nối model thật. Hãy cấu hình OpenAI."
+            503,
+            "AI_TEST_MODE",
+            "Mock mode không xác nhận kết nối model thật. Hãy cấu hình Gemini hoặc OpenAI.",
         )
     provider = configured_provider(settings)
     started = perf_counter()

@@ -6,7 +6,8 @@ import pytest
 
 from app.core.config import Settings
 from app.core.errors import DomainError
-from app.modules.ai.provider import NoRedirect, OpenAIProvider, ToolCall, availability
+from app.modules.ai.provider import OpenAIProvider, ToolCall, availability
+from app.modules.ai.providers.http import NoRedirect
 
 
 def settings():
@@ -33,7 +34,7 @@ def fake_http(monkeypatch, payload):
             captured.update(url=request.full_url, payload=json.loads(request.data), timeout=timeout)
             return Response()
 
-    monkeypatch.setattr("app.modules.ai.provider.build_opener", lambda *args: Opener())
+    monkeypatch.setattr("app.modules.ai.providers.http.build_opener", lambda *args: Opener())
     return captured
 
 
@@ -89,7 +90,7 @@ def test_network_errors_are_sanitized(monkeypatch):
         def open(self, *args, **kwargs):
             raise URLError("private-provider-payload")
 
-    monkeypatch.setattr("app.modules.ai.provider.build_opener", lambda *args: Broken())
+    monkeypatch.setattr("app.modules.ai.providers.http.build_opener", lambda *args: Broken())
     with pytest.raises(DomainError) as caught:
         OpenAIProvider(settings()).plan([], "Question")
     assert caught.value.code == "AI_PROVIDER_UNAVAILABLE"
@@ -125,7 +126,7 @@ def test_upstream_errors_are_actionable_and_do_not_expire_user_login(monkeypatch
                 "https://api.openai.com/v1/responses", status, "private-error", {}, body
             )
 
-    monkeypatch.setattr("app.modules.ai.provider.build_opener", lambda *args: Broken())
+    monkeypatch.setattr("app.modules.ai.providers.http.build_opener", lambda *args: Broken())
     with pytest.raises(DomainError) as caught:
         OpenAIProvider(settings()).plan([], "Question")
     assert caught.value.code == code
@@ -139,7 +140,7 @@ def test_provider_timeout_is_distinguishable_from_network_failure(monkeypatch):
         def open(self, *args, **kwargs):
             raise TimeoutError("private-timeout-payload")
 
-    monkeypatch.setattr("app.modules.ai.provider.build_opener", lambda *args: Slow())
+    monkeypatch.setattr("app.modules.ai.providers.http.build_opener", lambda *args: Slow())
     with pytest.raises(DomainError) as caught:
         OpenAIProvider(settings()).plan([], "Question")
     assert caught.value.code == "AI_PROVIDER_TIMEOUT"
