@@ -15,6 +15,9 @@ EVENT_FIELDS = {
     "PASSWORD_CHANGED": set(),
     "PRODUCT_ARCHIVED": {"sku"},
     "STOCK_ADJUSTED": {"product_id", "movement_type", "quantity"},
+    "AI_REQUESTED": set(),
+    "AI_TOOL_CALLED": {"tool_name", "success", "latency_ms"},
+    "AI_RESPONSE_FAILED": {"code"},
 }
 
 

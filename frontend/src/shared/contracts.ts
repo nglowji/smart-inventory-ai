@@ -17,7 +17,10 @@ export type AuditEvent =
   | "USER_PASSWORD_RESET"
   | "PASSWORD_CHANGED"
   | "PRODUCT_ARCHIVED"
-  | "STOCK_ADJUSTED";
+  | "STOCK_ADJUSTED"
+  | "AI_REQUESTED"
+  | "AI_TOOL_CALLED"
+  | "AI_RESPONSE_FAILED";
 export type AuditEntry = {
   id: string;
   actor_id: string | null;
@@ -25,7 +28,7 @@ export type AuditEntry = {
   event_type: AuditEvent;
   target_type: string;
   target_id: string | null;
-  details: Record<string, string | boolean>;
+  details: Record<string, string | boolean | number>;
   request_id: string | null;
   created_at: string;
 };

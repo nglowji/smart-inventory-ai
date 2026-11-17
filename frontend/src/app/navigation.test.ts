@@ -14,6 +14,8 @@ describe("navigation permissions", () => {
       expect(canAccessScreen("audit", user(role))).toBe(false);
       expect(primaryActionFor("users", user(role))).toBeNull();
       expect(canAccessScreen("dashboard", user(role))).toBe(true);
+      expect(canAccessScreen("assistant", user(role))).toBe(true);
+      expect(primaryActionFor("assistant", user(role))).toBeNull();
     },
   );
   it("allows only administrators to create accounts", () => {

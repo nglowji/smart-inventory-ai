@@ -8,6 +8,7 @@ from app.core.errors import error_response, install_error_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
 from app.db.connection import build_engine, database_is_ready
+from app.modules.ai.api import router as ai_router
 from app.modules.audit.api import router as audit_router
 from app.modules.auth.api import router as auth_router
 from app.modules.catalog.api import router as catalog_router
@@ -32,7 +33,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             engine.dispose()
 
-    application = FastAPI(title=config.app_name, version="0.4.0", lifespan=lifespan)
+    application = FastAPI(title=config.app_name, version="0.5.0", lifespan=lifespan)
     application.state.settings = config
     install_error_handlers(application)
     application.include_router(auth_router, prefix=API_PREFIX)
@@ -41,6 +42,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(reporting_router, prefix=API_PREFIX)
     application.include_router(users_router, prefix=API_PREFIX)
     application.include_router(audit_router, prefix=API_PREFIX)
+    application.include_router(ai_router, prefix=API_PREFIX)
     application.add_middleware(
         CORSMiddleware,
         allow_origins=config.cors_origins,

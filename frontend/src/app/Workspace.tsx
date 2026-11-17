@@ -5,6 +5,7 @@ import Dashboard from "../features/dashboard/DashboardPage";
 import History from "../features/inventory/HistoryPage";
 import UsersPage from "../features/users/UsersPage";
 import AuditPage from "../features/audit/AuditPage";
+import AssistantPage from "../features/assistant/AssistantPage";
 import OperationDialog from "../features/operations/OperationDialog";
 import type { Action } from "../features/operations/types";
 import type { Range, User } from "../shared/contracts";
@@ -151,6 +152,7 @@ export default function Workspace({ user, logout }: { user: User; logout: () => 
               refresh={refresh}
             />
           )}
+          {screen === "assistant" && <AssistantPage version={version} />}
           <footer className="page-footer">
             <span>SmartInventory AI</span>
             <span>Giá trị tồn kho là ước tính, không thay thế số liệu kế toán.</span>

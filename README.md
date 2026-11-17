@@ -1,6 +1,6 @@
 ﻿# SmartInventory AI
 
-Ứng dụng quản lý **một kho**, giao diện tiếng Việt, dữ liệu PostgreSQL thật. Đã có Foundation, Catalog, nghiệp vụ nhập/xuất/điều chỉnh và dashboard. AI Assistant chưa triển khai.
+Ứng dụng quản lý **một kho**, giao diện tiếng Việt, dữ liệu PostgreSQL thật. Đã có Foundation, Catalog, nghiệp vụ nhập/xuất/điều chỉnh, dashboard, quản trị tài khoản và nhật ký kiểm toán. AI Assistant chưa triển khai.
 
 ## Chạy trên Windows PowerShell
 
@@ -16,7 +16,7 @@ docker compose --env-file .env -f infra/docker-compose.yml up -d --wait
 .\.venv\Scripts\python.exe -c "from dotenv import dotenv_values,set_key; from secrets import token_urlsafe; set_key('.env','JWT_SECRET',dotenv_values('.env').get('JWT_SECRET') or token_urlsafe(48))"
 # Chỉ chạy seed khi chưa có Admin, không tự ghi đè tài khoản.
 .\.venv\Scripts\python.exe -m app.modules.auth.seed
-.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --app-dir backend --host 127.0.0.1 --port 8000
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --app-dir backend --host 127.0.0.1 --port 8000 --no-access-log
 ```
 
 Ở PowerShell thứ hai:
@@ -43,6 +43,21 @@ docker compose --env-file .env -f infra/docker-compose.yml stop
 ```
 
 Nếu cổng 5432 bận, sửa POSTGRES_PORT và cổng DATABASE_URL cho khớp. Đổi password trong .env sau khi volume DB đã tồn tại không tự đổi password trong PostgreSQL.
+
+### Chạy backend bằng Docker trên Windows
+
+Nếu Windows Application Control chặn DLL của `psycopg`, có thể chạy backend trong Linux container. Cấu hình này không thay đổi chính sách Windows. Giữ `.env` hiện tại; lần cài đầu cần điền cấu hình và sinh `JWT_SECRET` như hướng dẫn trên. API đọc secret từ môi trường lúc chạy; `.env` không được đóng vào image.
+
+```powershell
+docker compose --env-file .env -f infra/docker-compose.yml --profile api build api
+docker compose --env-file .env -f infra/docker-compose.yml --profile api run --rm api python -m alembic -c backend/alembic.ini upgrade head
+docker compose --env-file .env -f infra/docker-compose.yml --profile api run --rm api python -m alembic -c backend/alembic.ini check
+# Chỉ dùng seed khi chưa có Admin và đã điền ADMIN_PASSWORD trong .env.
+# docker compose --env-file .env -f infra/docker-compose.yml --profile api run --rm api python -m app.modules.auth.seed
+docker compose --env-file .env -f infra/docker-compose.yml --profile api up -d api
+```
+
+Frontend vẫn chạy bằng `npm run dev` và dùng cùng URL/API proxy. Không chạy đồng thời backend Python local và Docker trên cổng 8000. Sau khi sửa backend, build lại image và chạy `up -d api`. Profile `api` là tùy chọn; lệnh Compose cũ vẫn chỉ chạy DB. Container dùng user không phải root và chỉ mở API trên loopback của máy.
 
 ## Dashboard và giao diện vận hành
 
@@ -145,9 +160,9 @@ Mật khẩu lưu hash PBKDF2-SHA256 1.000.000 vòng qua Werkzeug; dùng cách n
 
 ## Phạm vi còn lại
 
-Chưa có AI Assistant, UI quản trị tài khoản, audit logs tổng quát, refresh token, rate limiting đăng nhập, deployment production, HTTPS, backup và secret management. Lịch sử kho đã lưu actor, thời gian, lý do và số dư trước/sau. Không khẳng định toàn bộ MVP hay production đã hoàn tất.
+Chưa có AI Assistant, refresh token, rate limiting đăng nhập, deployment production, HTTPS, backup và secret management. Lịch sử kho đã lưu actor, thời gian, lý do và số dư trước/sau. Nhật ký kiểm toán ghi các sự kiện được liệt kê trong Phase 3, chưa bao phủ mọi thay đổi dữ liệu. Không khẳng định toàn bộ MVP hay production đã hoàn tất.
 
-Compose hiện chỉ chạy PostgreSQL; backend/frontend chạy local. Vite proxy là cấu hình dev. Readiness cần bảo vệ khi triển khai công khai. Dependencies frontend có lockfile; Python hiện dùng khoảng phiên bản.
+Compose chạy PostgreSQL và có profile `api` tùy chọn cho backend; frontend chạy local. Vite proxy là cấu hình dev. Readiness cần bảo vệ khi triển khai công khai. Dependencies frontend có lockfile; Python hiện dùng khoảng phiên bản.
 
 Theo yêu cầu repository, chỉ README.md được đưa lên Git trong các file Markdown; đặc tả gốc và bộ skill giữ local. .env và các secrets không commit. Mỗi đợt triển khai đều có giải thích What → Why → How → Trade-offs → đối chiếu .NET.
 
@@ -288,4 +303,55 @@ Remove-Item Env:TEST_DATABASE_URL
 
 Thử trên UI: thêm SKU PCS → Nhập 30 → Xuất 18 với lý do → kiểm tra tồn 12 và history 0→30→12 → thử xuất 13 để thấy lỗi thiếu tồn. Những bước này dùng dữ liệu bạn chủ động nhập; automated tests luôn chạy trong schema test riêng.
 
-Điểm dừng sau Phase 2: nghiệm thu Stock Core trước khi tiếp tục hoàn thiện Phase 3 (auth, audit và báo cáo). Mật khẩu Admin local được đồng bộ giữa DB và .env; không lưu mật khẩu thực trong README hoặc Git.
+Phase 2 đã nghiệm thu Stock Core; phần tiếp theo bổ sung quản trị tài khoản và kiểm toán. Không lưu mật khẩu thực trong README hoặc Git.
+
+## Phase 3 — Quản trị tài khoản, phiên đăng nhập và kiểm toán
+
+Phiên bản 0.4.0 bổ sung màn hình **Tài khoản**, **Nhật ký hoạt động** cho Admin và chức năng **Đổi mật khẩu** cho người đang đăng nhập. Dashboard tiếp tục đọc số liệu từ PostgreSQL; không tạo tài khoản hay giao dịch giả để lấp giao diện.
+
+| API (tiền tố `/api/v1`) | Quyền và chức năng |
+|---|---|
+| `GET /users` | Admin tìm email và phân trang tài khoản |
+| `POST /users` | Admin tạo tài khoản ADMIN/STAFF/VIEWER |
+| `PATCH /users/{id}` | Admin đổi role, bật/tắt tài khoản hoặc đặt lại mật khẩu |
+| `POST /auth/change-password` | Người dùng xác nhận mật khẩu hiện tại để đổi mật khẩu của mình |
+| `GET /audit` | Admin xem nhật ký, lọc sự kiện, ngày, actor và phân trang |
+
+Mật khẩu mới dài 12–128 ký tự. API không trả password hash. Không có đăng ký công khai. Hệ thống ngăn vô hiệu hóa hoặc hạ quyền Admin hoạt động cuối cùng; transaction advisory lock tuần tự hóa các thay đổi quản trị để hai request đồng thời không cùng vượt qua kiểm tra này.
+
+**Phiên đăng nhập:** JWT xác định người dùng; backend đọc tài khoản trong DB để kiểm tra role, trạng thái và `auth_version`. Đổi mật khẩu, đặt lại mật khẩu, đổi role hoặc trạng thái sẽ tăng phiên bản và vô hiệu hóa các token cũ. Bật lại tài khoản không khôi phục token đã thu hồi. Sau nâng cấp từ 0.3, cần đăng nhập lại vì token cũ chưa có claim phiên bản; mật khẩu hiện tại không thay đổi.
+
+**Kiểm toán:** Ghi đăng nhập thành công/thất bại, tạo/cập nhật tài khoản, đặt lại/đổi mật khẩu, archive sản phẩm và điều chỉnh kho. Audit của thay đổi dữ liệu nằm trong cùng transaction: ghi audit lỗi thì nghiệp vụ rollback. Đăng nhập thất bại được commit trước khi trả 401 để vẫn có dấu vết. Retry điều chỉnh hoặc archive lặp không tạo thêm audit cho thay đổi đã hoàn tất. API nhật ký chỉ đọc.
+
+**Theo dõi request:** Middleware gán UUID `X-Request-ID`, trả trong header và dùng chung trong lỗi, audit, JSON log. Log chỉ giữ trường cho phép như route mẫu, status và thời gian xử lý; không ghi body, mật khẩu, token hay query string. Access log thô của Uvicorn được tắt. Metadata audit cũng theo danh sách cho phép, không lưu nguyên payload.
+
+### Cấu trúc và cách hiểu code
+
+- `modules/users`: API/schema, truy vấn đọc và service quản trị tách riêng.
+- `modules/audit`: ghi sự kiện theo whitelist, truy vấn phân trang và API chỉ đọc.
+- `modules/auth`: kiểm tra token, đăng nhập và đổi mật khẩu cá nhân.
+- `core/request_context.py`, `middleware.py`, `logging.py`: correlation ID và log có cấu trúc.
+- `frontend/src/features/users`, `audit`, `auth`: màn hình, form và API theo tính năng; app chỉ điều phối.
+- Migration `0003` thêm `users.auth_version` và bảng `audit_logs`, giữ nguyên dữ liệu hiện có.
+
+Với .NET, JWT validation tương ứng JWT Bearer authentication, kiểm tra role tương ứng authorization policy; audit cùng transaction tương tự lưu entity và audit bằng cùng DbContext transaction. Request ID tương tự TraceIdentifier được truyền qua middleware. Đổi lại, mỗi request cần đọc user trong DB để quyền mới và thu hồi phiên có hiệu lực ngay; hiện chưa có refresh token.
+
+### Chạy và nghiệm thu
+
+```powershell
+.\.venv\Scripts\python.exe -m alembic -c backend/alembic.ini upgrade head
+.\.venv\Scripts\python.exe -m alembic -c backend/alembic.ini check
+.\.venv\Scripts\python.exe -m ruff check backend
+.\.venv\Scripts\python.exe -m ruff format --check backend
+# Dùng TEST_DATABASE_URL trỏ DB test riêng như hướng dẫn Phase 2.
+.\.venv\Scripts\python.exe -m pytest backend/tests -q
+# Trong frontend:
+npm run format:check
+npm run lint
+npm test
+npm run build
+```
+
+Đã nghiệm thu 115 tests backend và 17 tests frontend, gồm thu hồi token, cạnh tranh Admin cuối, rollback khi ghi audit lỗi và bảo mật log. Biến `ADMIN_PASSWORD` trong `.env` dùng khi seed Admin ban đầu; đổi mật khẩu qua UI không tự sửa `.env`. Mật khẩu đăng nhập thực tế lấy từ DB.
+
+Bước tiếp theo là Phase 4 AI Assistant; chưa tích hợp LLM trong Phase 3.

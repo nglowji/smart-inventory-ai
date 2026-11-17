@@ -13,6 +13,9 @@ AuditEvent = Literal[
     "PASSWORD_CHANGED",
     "PRODUCT_ARCHIVED",
     "STOCK_ADJUSTED",
+    "AI_REQUESTED",
+    "AI_TOOL_CALLED",
+    "AI_RESPONSE_FAILED",
 ]
 
 
@@ -23,6 +26,6 @@ class AuditRead(BaseModel):
     event_type: AuditEvent
     target_type: str
     target_id: UUID | None
-    details: dict[str, str | bool]
+    details: dict[str, str | bool | int]
     request_id: UUID | None
     created_at: datetime

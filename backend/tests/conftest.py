@@ -18,6 +18,15 @@ from app.modules.auth.service import passwords
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.fixture(autouse=True)
+def isolate_application_environment(monkeypatch):
+    # Runtime secrets/settings must not make tests connect to the application's DB.
+    # Integration fixtures only use the explicitly configured TEST_DATABASE_URL.
+    for name in tuple(os.environ):
+        if name.lower() in Settings.model_fields:
+            monkeypatch.delenv(name)
+
+
 def migration_config(connection):
     config = Config(str(BACKEND_ROOT / "alembic.ini"))
     config.attributes["connection"] = connection

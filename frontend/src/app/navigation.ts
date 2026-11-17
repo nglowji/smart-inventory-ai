@@ -33,6 +33,12 @@ export const navigation = [
     description: "Theo dõi từng lần nhập, xuất và điều chỉnh tồn kho.",
   },
   {
+    id: "assistant",
+    label: "Trợ lý AI",
+    icon: "chat",
+    description: "Hỏi dữ liệu kho bằng tiếng Việt, có nguồn để đối chiếu.",
+  },
+  {
     id: "users",
     label: "Tài khoản",
     icon: "users",

@@ -1,0 +1,8 @@
+*
+!backend/
+!backend/**
+backend/**/__pycache__/
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/*.egg-info/
+backend/*.log

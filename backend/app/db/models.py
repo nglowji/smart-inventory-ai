@@ -14,6 +14,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -135,6 +136,7 @@ class AuditLog(Base):
     __table_args__ = (
         Index("ix_audit_created_id", "created_at", "id"),
         Index("ix_audit_event_created", "event_type", "created_at"),
+        Index("ix_audit_actor_event_created", "actor_id", "event_type", "created_at"),
     )
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     actor_id: Mapped[UUID | None] = mapped_column(ForeignKey("users.id"))
@@ -143,4 +145,33 @@ class AuditLog(Base):
     target_id: Mapped[UUID | None] = mapped_column()
     details: Mapped[dict] = mapped_column("metadata", JSONB, server_default="{}", default=dict)
     request_id: Mapped[UUID | None] = mapped_column()
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AiConversation(Base):
+    __tablename__ = "ai_conversations"
+    __table_args__ = (Index("ix_ai_conversations_owner_updated", "user_id", "updated_at", "id"),)
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
+    title: Mapped[str] = mapped_column(String(100))
+    pending_request_id: Mapped[UUID | None] = mapped_column()
+    pending_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class AiMessage(Base):
+    __tablename__ = "ai_messages"
+    __table_args__ = (
+        CheckConstraint("role IN ('USER','ASSISTANT')", name="role"),
+        UniqueConstraint("conversation_id", "client_request_id", "role", name="uq_ai_message_turn"),
+        Index("ix_ai_messages_conversation_created", "conversation_id", "created_at", "id"),
+    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    conversation_id: Mapped[UUID] = mapped_column(ForeignKey("ai_conversations.id"))
+    client_request_id: Mapped[UUID] = mapped_column()
+    role: Mapped[str] = mapped_column(String(20))
+    content: Mapped[str] = mapped_column(Text)
+    sources: Mapped[list] = mapped_column(JSONB, server_default="[]", default=list)
+    tool_calls: Mapped[list] = mapped_column(JSONB, server_default="[]", default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -8,7 +8,8 @@ import { Pagination } from "../../shared/ui/Pagination";
 import { fetchAudit } from "./api";
 import { auditLabels, detailLabels, isAuditEvent } from "./model";
 
-function displayValue(value: string | boolean): string {
+function displayValue(value: string | boolean | number): string {
+  if (typeof value === "number") return String(value);
   if (typeof value === "boolean") return value ? "Có" : "Không";
   if (isRole(value)) return roleLabels[value];
   return value === "invalid_credentials" ? "Thông tin đăng nhập không đúng" : value;

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 type Name =
+  | "chat"
   | "users"
   | "audit"
   | "key"
@@ -22,6 +23,12 @@ type Name =
   | "alert"
   | "check";
 const paths: Record<Name, ReactNode> = {
+  chat: (
+    <>
+      <path d="M21 11a8 8 0 0 1-8 8H8l-5 3V11a9 9 0 0 1 18 0Z" />
+      <path d="M7 10h10M7 14h6" />
+    </>
+  ),
   users: (
     <>
       <circle cx="9" cy="8" r="3" />
