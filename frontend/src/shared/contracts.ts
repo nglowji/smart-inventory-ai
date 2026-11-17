@@ -20,7 +20,8 @@ export type AuditEvent =
   | "STOCK_ADJUSTED"
   | "AI_REQUESTED"
   | "AI_TOOL_CALLED"
-  | "AI_RESPONSE_FAILED";
+  | "AI_RESPONSE_FAILED"
+  | "DEMO_DATA_IMPORTED";
 export type AuditEntry = {
   id: string;
   actor_id: string | null;

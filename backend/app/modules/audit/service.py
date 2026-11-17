@@ -18,6 +18,7 @@ EVENT_FIELDS = {
     "AI_REQUESTED": set(),
     "AI_TOOL_CALLED": {"tool_name", "success", "latency_ms"},
     "AI_RESPONSE_FAILED": {"code"},
+    "DEMO_DATA_IMPORTED": {"version", "products", "movements", "categories", "suppliers"},
 }
 
 

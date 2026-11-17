@@ -16,6 +16,7 @@ AuditEvent = Literal[
     "AI_REQUESTED",
     "AI_TOOL_CALLED",
     "AI_RESPONSE_FAILED",
+    "DEMO_DATA_IMPORTED",
 ]
 
 

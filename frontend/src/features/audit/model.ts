@@ -1,6 +1,7 @@
 import type { AuditEvent } from "../../shared/contracts";
 
 export const auditLabels: Record<AuditEvent, string> = {
+  DEMO_DATA_IMPORTED: "Tạo bộ dữ liệu mẫu",
   AI_REQUESTED: "Gửi câu hỏi AI",
   AI_TOOL_CALLED: "AI tra cứu dữ liệu",
   AI_RESPONSE_FAILED: "AI xử lý thất bại",
@@ -14,6 +15,11 @@ export const auditLabels: Record<AuditEvent, string> = {
   STOCK_ADJUSTED: "Điều chỉnh tồn kho",
 };
 export const detailLabels: Record<string, string> = {
+  version: "Phiên bản bộ mẫu",
+  products: "Số sản phẩm",
+  movements: "Số giao dịch",
+  categories: "Số danh mục",
+  suppliers: "Số nhà cung cấp",
   tool_name: "Công cụ tra cứu",
   success: "Thành công",
   latency_ms: "Thời gian (ms)",
