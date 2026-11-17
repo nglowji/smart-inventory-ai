@@ -1,3 +1,4 @@
+import json
 import re
 from datetime import datetime, timedelta
 
@@ -15,6 +16,29 @@ class MockProvider:
             return []
         sku_match = re.search(r"\b[A-Z][A-Z0-9_-]*\d[A-Z0-9_-]*\b", question.upper())
         sku = sku_match.group() if sku_match else None
+        if not sku and any(term in normalized for term in ["ma do", "ma thu hai", "con bao nhieu"]):
+            for item in reversed(history):
+                try:
+                    memory = json.loads(item["content"]).get("verified_context", {})
+                    choices = memory.get("choices", [])
+                    sku = (
+                        choices[1]
+                        if "ma thu hai" in normalized and len(choices) > 1
+                        else memory.get("sku")
+                    )
+                    if sku:
+                        break
+                except (ValueError, TypeError, AttributeError):
+                    continue
+        if any(term in normalized for term in ["huong dan", "quy trinh", "quyen", "vai tro"]):
+            topic = "roles" if "quyen" in normalized or "vai tro" in normalized else "inventory"
+            return [ToolCall("get_system_help", {"topic": topic})]
+        if "tong quan kho" in normalized:
+            return [ToolCall("get_warehouse_overview", {})]
+        if sku and any(
+            term in normalized for term in ["chi tiet", "nha cung cap", "danh muc", "gia bao nhieu"]
+        ):
+            return [ToolCall("get_product_details", {"sku": sku})]
         if "sap het" in normalized or "duoi nguong" in normalized or "low stock" in normalized:
             return [ToolCall("list_low_stock", {})]
         if sku and any(term in normalized for term in ("goi y", "nen nhap", "de xuat")):

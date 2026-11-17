@@ -17,19 +17,29 @@ def help_answer(data):
 def overview_answer(data):
     health = data["health"]
     body = (
-        f"Kho hiện có {data['total_active_skus']} SKU hoạt động và {data['archived_skus']} SKU ngừng hoạt động.\n"
-        f"• Đủ ngưỡng: {health['healthy']}; còn hàng nhưng dưới ngưỡng: {health['low']}; hết hàng: {health['out_of_stock']}.\n"
-        f"• Dưới ngưỡng tối thiểu (gồm cả hàng hết khi min_stock > 0): {data['low_stock_count']} SKU.\n"
-        f"• Giá trị tồn ước tính hiện tại: {money(data['estimated_inventory_value_vnd'])}, gồm hàng ngừng hoạt động còn tồn.\n"
+        f"Kho hiện có {data['total_active_skus']} SKU hoạt động "
+        f"và {data['archived_skus']} SKU ngừng hoạt động.\n"
+        f"• Đủ ngưỡng: {health['healthy']}; còn hàng nhưng dưới ngưỡng: {health['low']}; "
+        f"hết hàng: {health['out_of_stock']}.\n"
+        "• Dưới ngưỡng tối thiểu (gồm cả hàng hết khi min_stock > 0): "
+        f"{data['low_stock_count']} SKU.\n"
+        f"• Giá trị tồn ước tính hiện tại: {money(data['estimated_inventory_value_vnd'])}, "
+        "gồm hàng ngừng hoạt động còn tồn.\n"
     )
     body += "\n".join(f"• Tồn {unit}: {qty}." for unit, qty in data["stock_by_unit"].items())
-    body += f"\nTừ {data['date_from']} đến hết {data['date_to']}: {data['movement_count']} giao dịch, bao gồm điều chỉnh."
+    body += (
+        f"\nTừ {data['date_from']} đến hết {data['date_to']}: "
+        f"{data['movement_count']} giao dịch, bao gồm điều chỉnh."
+    )
     if health["out_of_stock"]:
         body += (
             "\nƯu tiên kiểm tra hàng hết trước, sau đó xem hàng dưới ngưỡng và gợi ý nhập từng SKU."
         )
     if data["has_demo_data"]:
-        body += "\nKho có dữ liệu mô phỏng: SKU DEMO- và giao dịch [DEMO] cần phân biệt với nghiệp vụ thực tế."
+        body += (
+            "\nKho có dữ liệu mô phỏng: SKU DEMO- và giao dịch [DEMO] "
+            "cần phân biệt với nghiệp vụ thực tế."
+        )
     return body
 
 
@@ -37,10 +47,13 @@ def product_answer(data):
     body = (
         f"{data['sku']} — {data['name']}\n"
         f"• Trạng thái: {'đang hoạt động' if data['is_active'] else 'đã ngừng hoạt động'}.\n"
-        f"• Tồn hiện tại: {data['on_hand']} {data['unit']}; ngưỡng tối thiểu: {data['min_stock']} {data['unit']}.\n"
-        f"• Đơn giá hiện tại: {money(data['unit_cost_vnd'])}/{data['unit']}; giá trị tồn ước tính: {money(data['value_vnd'])}.\n"
+        f"• Tồn hiện tại: {data['on_hand']} {data['unit']}; "
+        f"ngưỡng tối thiểu: {data['min_stock']} {data['unit']}.\n"
+        f"• Đơn giá hiện tại: {money(data['unit_cost_vnd'])}/{data['unit']}; "
+        f"giá trị tồn ước tính: {money(data['value_vnd'])}.\n"
         f"• Danh mục: {data['category'] or 'Chưa phân loại'}.\n"
-        f"• Nhà cung cấp mặc định: {data['supplier'] or 'Chưa gán'}; thời gian chờ dự kiến: {data['lead_time_days']} ngày."
+        f"• Nhà cung cấp mặc định: {data['supplier'] or 'Chưa gán'}; "
+        f"thời gian chờ dự kiến: {data['lead_time_days']} ngày."
     )
     if data["supplier"] and not data["supplier_active"]:
         body += "\nNhà cung cấp mặc định hiện đã ngừng hoạt động."
@@ -74,7 +87,8 @@ def inventory_answer(data):
 def changes_answer(data):
     totals = data["totals"]
     body = (
-        f"Biến động {data['sku']} từ {data['from_date']} đến hết {data['to_date']} (giờ Việt Nam):\n"
+        f"Biến động {data['sku']} từ {data['from_date']} "
+        f"đến hết {data['to_date']} (giờ Việt Nam):\n"
         f"• Tồn đầu kỳ: {data['opening']} {data['unit']}.\n"
         f"• Nhập IN: +{totals['IN']}; xuất OUT: −{totals['OUT']}.\n"
         f"• Điều chỉnh tăng: +{totals['ADJUST_IN']}; điều chỉnh giảm: −{totals['ADJUST_OUT']}.\n"
@@ -95,8 +109,8 @@ def ranking_answer(data):
         for index, row in enumerate(rows, 1):
             body += f"\n{index}. {row['sku']} — {row['name']}: {row['quantity']} {unit}."
     return (
-        body
-        + "\nXếp hạng riêng từng đơn vị; không cộng khác đơn vị và không tính ADJUST_OUT. Đây là lượng xuất, chưa phải doanh thu."
+        body + "\nXếp hạng riêng từng đơn vị; không cộng khác đơn vị và không tính ADJUST_OUT. "
+        "Đây là lượng xuất, chưa phải doanh thu."
     )
 
 
@@ -108,7 +122,8 @@ def catalog_answer(data):
         title
         + ":\n"
         + "\n".join(
-            f"• {row['name']}: {'hoạt động' if row['is_active'] else 'ngừng hoạt động'}, {row['sku_count']} SKU liên kết."
+            f"• {row['name']}: {'hoạt động' if row['is_active'] else 'ngừng hoạt động'}, "
+            f"{row['sku_count']} SKU liên kết."
             for row in data["items"]
         )
     )
