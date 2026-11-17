@@ -1,10 +1,10 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Literal
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.core.dates import date_bounds
+from app.core.dates import LOCAL_ZONE, date_bounds
 
 
 class ConversationCreate(BaseModel):
@@ -90,3 +90,48 @@ class RecentArgs(LimitArgs):
 
 class ReplenishmentArgs(SkuArgs):
     lookback_days: int = Field(default=30, ge=1, le=366, strict=True)
+
+
+class PeriodArgs(ToolArgs):
+    from_date: date | None = None
+    to_date: date | None = None
+
+    @model_validator(mode="after")
+    def resolve_period(self):
+        self.to_date = self.to_date or datetime.now(LOCAL_ZONE).date()
+        self.from_date = self.from_date or self.to_date - timedelta(days=29)
+        date_bounds(self.from_date, self.to_date)
+        return self
+
+
+class HelpArgs(ToolArgs):
+    topic: Literal["overview", "inventory", "roles", "dashboard", "assistant", "replenishment", "data"] = "overview"
+
+
+class InventoryArgs(LimitArgs, PeriodArgs):
+    status: Literal["active", "all", "low_stock", "out_of_stock", "archived", "no_outbound"] = "active"
+    unit: Literal["PCS", "KG", "LITER"] | None = None
+    category: str | None = Field(default=None, min_length=1, max_length=100)
+    supplier: str | None = Field(default=None, min_length=1, max_length=100)
+    sort: Literal["sku", "on_hand_desc", "value_desc", "lowest_coverage"] = "sku"
+
+    @model_validator(mode="after")
+    def comparable_units(self):
+        if self.sort == "on_hand_desc" and not self.unit:
+            raise ValueError("Quantity ranking requires one unit")
+        return self
+
+
+class StockChangeArgs(SkuArgs, PeriodArgs):
+    pass
+
+
+class RankingArgs(LimitArgs, PeriodArgs):
+    limit: int = Field(default=5, ge=1, le=20, strict=True)
+    unit: Literal["PCS", "KG", "LITER"] | None = None
+
+
+class CatalogArgs(LimitArgs):
+    kind: Literal["category", "supplier"]
+    query: str | None = Field(default=None, min_length=1, max_length=100)
+    active: bool | None = Field(default=True, strict=True)

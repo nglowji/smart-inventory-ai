@@ -174,4 +174,5 @@ class AiMessage(Base):
     content: Mapped[str] = mapped_column(Text)
     sources: Mapped[list] = mapped_column(JSONB, server_default="[]", default=list)
     tool_calls: Mapped[list] = mapped_column(JSONB, server_default="[]", default=list)
+    planner_context: Mapped[dict] = mapped_column(JSONB, server_default="{}", default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
