@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 
 from sqlalchemy import select
@@ -6,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import DomainError
 from app.db.models import AiConversation, AiMessage
 from app.db.pagination import paginate
+from app.modules.ai.memory import sanitize_context
 
 
 def owned_conversation(session: Session, conversation_id: UUID, user_id: UUID, *, lock=False):
@@ -59,11 +61,43 @@ def completed_turn(session: Session, conversation_id: UUID, request_id: UUID):
 
 
 def recent_context(session: Session, conversation_id: UUID) -> list[dict]:
-    # No DB product names, movement notes, assistant text or credentials go to the model.
+    # Only user questions and allowlisted reference memory go to the model, never answers/names.
     rows = session.scalars(
         select(AiMessage)
         .where(AiMessage.conversation_id == conversation_id, AiMessage.role == "USER")
         .order_by(AiMessage.created_at.desc(), AiMessage.id.desc())
         .limit(4)
     ).all()
-    return [{"role": "user", "content": row.content[:500]} for row in reversed(rows)]
+    answers = (
+        session.scalars(
+            select(AiMessage).where(
+                AiMessage.conversation_id == conversation_id,
+                AiMessage.role == "ASSISTANT",
+                AiMessage.client_request_id.in_([row.client_request_id for row in rows]),
+            )
+        ).all()
+        if rows
+        else []
+    )
+    contexts = {}
+    for answer in answers:
+        context = sanitize_context(answer.planner_context)
+        if not context:
+            choices = [source.get("sku") for source in answer.sources if source.get("sku")]
+            context = sanitize_context(
+                {"choices": choices, "sku": choices[0] if len(choices) == 1 else None}
+            )
+        contexts[answer.client_request_id] = context
+    return [
+        {
+            "role": "user",
+            "content": json.dumps(
+                {
+                    "previous_question": row.content[:500],
+                    "verified_context": contexts.get(row.client_request_id, {}),
+                },
+                ensure_ascii=False,
+            ),
+        }
+        for row in reversed(rows)
+    ]

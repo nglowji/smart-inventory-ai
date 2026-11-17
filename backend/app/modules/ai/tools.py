@@ -10,7 +10,6 @@ from app.core.dates import date_bounds
 from app.core.errors import DomainError
 from app.db.models import Product, StockBalance, StockMovement
 from app.modules.ai.detail_tools import DETAIL_TOOLS
-from app.modules.ai.tool_queries import STOCK, contains_text, encode_row, stock_row
 from app.modules.ai.policies import replenishment
 from app.modules.ai.schemas import (
     LimitArgs,
@@ -20,6 +19,8 @@ from app.modules.ai.schemas import (
     SearchArgs,
     SkuArgs,
 )
+from app.modules.ai.tool_queries import STOCK, contains_text, encode_row, stock_row
+
 
 def get_stock(session, args, now):
     row = stock_row(session, args.sku)

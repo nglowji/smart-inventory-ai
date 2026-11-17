@@ -14,8 +14,13 @@ def sanitize_context(value) -> dict:
     if not isinstance(value, dict):
         return {}
     result = {}
-    choices = list(dict.fromkeys(sku for item in value.get("choices", [])[:20]
-                                if (sku := safe_sku(item)))) if isinstance(value.get("choices"), list) else []
+    choices = (
+        list(
+            dict.fromkeys(sku for item in value.get("choices", [])[:20] if (sku := safe_sku(item)))
+        )
+        if isinstance(value.get("choices"), list)
+        else []
+    )
     if choices:
         result["choices"] = choices
     if sku := safe_sku(value.get("sku")):
@@ -39,6 +44,11 @@ def build_context(results: list[dict]) -> dict:
         for row in data.get("items", []):
             if sku := safe_sku(row.get("sku")):
                 skus.append(sku)
+        rankings = data.get("ranking_by_unit", {})
+        if len(rankings) == 1:
+            for row in next(iter(rankings.values())):
+                if sku := safe_sku(row.get("sku")):
+                    skus.append(sku)
         for key in ["from_date", "to_date"]:
             if key in data:
                 dates[key] = data[key]

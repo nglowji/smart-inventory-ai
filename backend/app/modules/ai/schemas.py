@@ -105,11 +105,15 @@ class PeriodArgs(ToolArgs):
 
 
 class HelpArgs(ToolArgs):
-    topic: Literal["overview", "inventory", "roles", "dashboard", "assistant", "replenishment", "data"] = "overview"
+    topic: Literal[
+        "overview", "inventory", "roles", "dashboard", "assistant", "replenishment", "data"
+    ] = "overview"
 
 
 class InventoryArgs(LimitArgs, PeriodArgs):
-    status: Literal["active", "all", "low_stock", "out_of_stock", "archived", "no_outbound"] = "active"
+    status: Literal["active", "all", "low_stock", "out_of_stock", "archived", "no_outbound"] = (
+        "active"
+    )
     unit: Literal["PCS", "KG", "LITER"] | None = None
     category: str | None = Field(default=None, min_length=1, max_length=100)
     supplier: str | None = Field(default=None, min_length=1, max_length=100)

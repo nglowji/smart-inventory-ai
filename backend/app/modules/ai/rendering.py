@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from app.core.dates import LOCAL_ZONE
+from app.modules.ai.detail_rendering import DETAIL_RENDERERS
 
 READ_ONLY_ANSWER = (
     "Trợ lý chỉ tra cứu dữ liệu kho và gợi ý nhập hàng. "
@@ -18,6 +19,8 @@ def render_result(result: dict) -> str:
     name, data = result["tool"], result["data"]
     if data.get("found") is False:
         body = f"Không tìm thấy SKU {data['sku']} trong dữ liệu kho. Bạn hãy kiểm tra lại mã."
+    elif name in DETAIL_RENDERERS:
+        body = DETAIL_RENDERERS[name](data)
     elif name == "get_stock_by_sku":
         body = (
             f"{data['sku']} — {data['name']}: còn {data['on_hand']} {data['unit']}; "
@@ -34,16 +37,17 @@ def render_result(result: dict) -> str:
             )
         else:
             body = "\n".join(
-                f"• {row['sku']} — {row['name']}: còn {row['on_hand']} {row['unit']}"
+                (f"{index}. " if name == "search_products" else "• ")
+                + f"{row['sku']} — {row['name']}: còn {row['on_hand']} {row['unit']}"
                 + (
                     f", thiếu {row['shortage_to_min']} {row['unit']} so với ngưỡng."
                     if name == "list_low_stock"
                     else "."
                 )
-                for row in data["items"]
+                for index, row in enumerate(data["items"], 1)
             )
             if name == "search_products":
-                body += "\nBạn muốn tra cứu mã SKU nào trong danh sách?"
+                body += "\nBạn muốn tra cứu mã SKU nào trong danh sách? Có thể chọn theo số thứ tự."
             if data["truncated"]:
                 body += "\nDanh sách đã giới hạn; còn kết quả khác. Hãy thu hẹp câu hỏi."
     elif name == "summarize_outbound":
@@ -93,4 +97,7 @@ def render_result(result: dict) -> str:
             )
         body += f"\n{data['assumptions']} Đây là gợi ý hỗ trợ quyết định."
     as_of = datetime.fromisoformat(result["source"]["as_of"]).astimezone(LOCAL_ZONE)
-    return body.strip() + f"\nNguồn: dữ liệu kho lúc {as_of:%H:%M:%S %d/%m/%Y} (giờ Việt Nam)."
+    source = "hướng dẫn nghiệp vụ SmartInventory AI" if name == "get_system_help" else "dữ liệu kho"
+    return (
+        body.strip() + f"\nNguồn: {source}, đối chiếu lúc {as_of:%H:%M:%S %d/%m/%Y} (giờ Việt Nam)."
+    )

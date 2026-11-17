@@ -11,6 +11,7 @@ from app.core.config import Settings
 from app.core.errors import DomainError
 from app.core.request_context import request_id
 from app.db.models import AiConversation, AiMessage, AuditLog, User
+from app.modules.ai.memory import build_context
 from app.modules.ai.policies import requests_write
 from app.modules.ai.queries import completed_turn, owned_conversation, recent_context
 from app.modules.ai.rendering import CLARIFY_ANSWER, READ_ONLY_ANSWER, render_result
@@ -153,6 +154,7 @@ def send_message(
     provider,
 ) -> Answer:
     user_id = user.id
+    role = user.role
     previous, lease, context = acquire_turn(session, user_id, conversation_id, payload, settings)
     if previous:
         return previous
@@ -192,6 +194,8 @@ def send_message(
                 finally:
                     trace["latency_ms"] = round((perf_counter() - tick) * 1000)
                 trace["success"] = True
+                if call.name == "get_system_help":
+                    result["data"]["current_role"] = role
                 results.append(result)
             answer = (
                 "\n\n".join(render_result(result) for result in results)
@@ -224,6 +228,7 @@ def send_message(
             content=answer,
             sources=[result["source"] for result in results],
             tool_calls=[result["tool"] for result in results],
+            planner_context=build_context(results),
             created_at=now + timedelta(microseconds=1),
         )
         session.add(response)

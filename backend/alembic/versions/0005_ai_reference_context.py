@@ -12,8 +12,15 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column("ai_messages", sa.Column("planner_context", postgresql.JSONB(),
-                                         server_default=sa.text("'{}'::jsonb"), nullable=False))
+    op.add_column(
+        "ai_messages",
+        sa.Column(
+            "planner_context",
+            postgresql.JSONB(),
+            server_default=sa.text("'{}'::jsonb"),
+            nullable=False,
+        ),
+    )
 
 
 def downgrade():

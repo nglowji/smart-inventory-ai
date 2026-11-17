@@ -57,7 +57,7 @@ def test_responses_api_contract_and_bounded_tools(monkeypatch):
     assert calls == [ToolCall("get_stock_by_sku", {"sku": "SP001"})]
     assert captured["url"] == "https://api.openai.com/v1/responses"
     assert captured["payload"]["store"] is False
-    assert len(captured["payload"]["tools"]) == 6
+    assert len(captured["payload"]["tools"]) == 13
     assert captured["payload"]["max_output_tokens"] == 1200
     assert "private-test-key" not in json.dumps(captured["payload"])
     assert NoRedirect().redirect_request(None, None, 302, "", {}, "https://other.example") is None

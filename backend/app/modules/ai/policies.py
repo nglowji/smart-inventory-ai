@@ -10,6 +10,17 @@ def fold_text(value: str) -> str:
 
 def requests_write(message: str) -> bool:
     normalized = fold_text(message)
+    explicit = re.search(
+        r"\b(hay|thuc hien|vui long|giup toi)\s+(nhap|xuat|sua|xoa|cap nhat|tao giao dich)\b",
+        normalized,
+    )
+    reading = re.search(
+        r"\b(huong dan|cach|quy trinh|lam the nao|quyen|giai thich|vi sao|tai sao|"
+        r"tong|thong ke|bao cao|lich su|da xuat|da nhap|goi y|de xuat)\b",
+        normalized,
+    )
+    if reading and not explicit:
+        return False
     return bool(
         re.search(
             r"\b(nhap kho|xuat kho|cap nhat|xoa|dat mua|tao giao dich|sua ton|doi ton)\b"
