@@ -8,6 +8,12 @@ import { MovementsTable } from "../inventory/MovementsTable";
 import type { Action } from "../operations/types";
 import { fetchDashboard } from "./api";
 import FlowChart from "./FlowChart";
+import ActivityPanel from "./ActivityPanel";
+import CategoryValuePanel from "./CategoryValuePanel";
+import InventoryHealthPanel from "./InventoryHealthPanel";
+import MovementMix from "./MovementMix";
+import OperationalStats from "./OperationalStats";
+import TopOutboundPanel from "./TopOutboundPanel";
 
 export default function Dashboard({
   range,
@@ -34,7 +40,7 @@ export default function Dashboard({
   const { data, error } = useResource(load, version);
   if (error) return <Failure message={error} retry={refresh} />;
   if (!data) return <Loading />;
-  const { summary, flow, low, latest } = data;
+  const { summary, flow, low, latest, insights } = data;
   const hasFlow = flow.items.some(
     (item) =>
       item.unit === unit && (Number(item.inbound) > 0 || Number(item.outbound) > 0),
@@ -46,11 +52,15 @@ export default function Dashboard({
         <span>
           <span className="status-dot" />
           Dữ liệu kho
+          {insights.has_demo_data && (
+            <span className="badge soft">Có dữ liệu mẫu [DEMO]</span>
+          )}
         </span>
         <span>Cập nhật {dateTime(summary.as_of)} · Giờ Việt Nam</span>
       </div>
       <p className="dashboard-context-note">
-        Số liệu tồn là hiện tại; khoảng ngày áp dụng cho giao dịch và biểu đồ.
+        Tồn, tình trạng và giá trị theo danh mục là hiện tại. Khoảng ngày áp dụng cho
+        nhập/xuất, nhịp hoạt động và xếp hạng sản phẩm.
       </p>
       <section className="metric-grid" aria-label="Tổng quan kho">
         <button className="kpi" onClick={() => viewProducts()}>
@@ -114,6 +124,7 @@ export default function Dashboard({
           </div>
         ))}
       </section>
+      <OperationalStats data={insights} />
       <div className="dashboard-grid">
         <section className="panel flow-panel">
           <header className="panel-heading">
@@ -167,6 +178,7 @@ export default function Dashboard({
           <p className="panel-footnote">
             Số lượng được tách theo đơn vị; không bao gồm giao dịch điều chỉnh.
           </p>
+          <MovementMix items={insights.movement_types} />
         </section>
         <section className="panel low-panel">
           <header className="panel-heading">
@@ -237,6 +249,17 @@ export default function Dashboard({
         </section>
       </div>
 
+      <div className="insights-row">
+        <InventoryHealthPanel health={insights.health} viewProducts={viewProducts} />
+        <CategoryValuePanel
+          items={insights.category_values}
+          total={insights.estimated_inventory_value_vnd}
+        />
+      </div>
+      <div className="insights-row activity-row">
+        <ActivityPanel data={insights} />
+        <TopOutboundPanel data={insights.top_outbound} />
+      </div>
       <section className="panel recent-panel">
         <header className="panel-heading">
           <div>
