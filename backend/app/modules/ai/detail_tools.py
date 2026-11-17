@@ -123,7 +123,9 @@ def stock_changes(session, args, now):
     if not row:
         return {"sku": args.sku, "found": False}
     start, end = date_bounds(args.from_date, args.to_date)
-    product_id = session.scalar(select(Product.id).where(Product.sku == args.sku))
+    product_id, created_at = session.execute(
+        select(Product.id, Product.created_at).where(Product.sku == args.sku)
+    ).one()
 
     def balance_at(boundary):
         value = session.scalar(
@@ -158,6 +160,8 @@ def stock_changes(session, args, now):
         "current_on_hand": str(row["on_hand"]),
         "totals": totals,
         "movement_count": count,
+        "existed_in_period": created_at < end,
+        "period_in_future": start > now,
     }
 
 

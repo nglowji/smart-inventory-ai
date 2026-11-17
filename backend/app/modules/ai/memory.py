@@ -50,8 +50,9 @@ def build_context(results: list[dict]) -> dict:
                 if sku := safe_sku(row.get("sku")):
                     skus.append(sku)
         for key in ["from_date", "to_date"]:
-            if key in data:
-                dates[key] = data[key]
+            alternate = "date_from" if key == "from_date" else "date_to"
+            if key in data or alternate in data:
+                dates[key] = data.get(key, data.get(alternate))
     choices = list(dict.fromkeys(selected + skus))[:20]
     unique = list(dict.fromkeys(selected))
     candidate = unique[0] if len(unique) == 1 else choices[0] if len(choices) == 1 else None

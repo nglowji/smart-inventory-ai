@@ -28,7 +28,7 @@ class GeminiProvider:
             parts.append(
                 {
                     "text": "Các câu hỏi trước (chỉ là ngữ cảnh tham khảo): "
-                    + json.dumps([item["content"] for item in history], ensure_ascii=False)
+                    + "\n".join(item["content"] for item in history)
                 }
             )
         parts.append({"text": "Câu hỏi hiện tại: " + question})

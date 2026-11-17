@@ -85,6 +85,14 @@ def inventory_answer(data):
 
 
 def changes_answer(data):
+    if data.get("period_in_future"):
+        return "Khoảng ngày nằm trong tương lai; chưa có lịch sử để xác định tồn đầu/cuối kỳ đó."
+    if data.get("existed_in_period") is False:
+        return (
+            f"SKU {data['sku']} chưa được tạo trong khoảng "
+            f"{data['from_date']} đến hết {data['to_date']}; "
+            "không có số liệu tồn lịch sử của SKU cho kỳ này."
+        )
     totals = data["totals"]
     body = (
         f"Biến động {data['sku']} từ {data['from_date']} "
