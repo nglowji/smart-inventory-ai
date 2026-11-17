@@ -1,5 +1,6 @@
 import json
-from urllib.error import URLError
+from io import BytesIO
+from urllib.error import HTTPError, URLError
 
 import pytest
 
@@ -102,3 +103,43 @@ def test_unconfigured_provider_status_is_explicit():
         is False
     )
     assert availability(Settings(_env_file=None, ai_provider="mock"))["mode"] == "mock"
+
+
+@pytest.mark.parametrize(
+    "status,code",
+    [
+        (400, "AI_PROVIDER_REQUEST_REJECTED"),
+        (401, "AI_PROVIDER_AUTH_FAILED"),
+        (403, "AI_PROVIDER_ACCESS_DENIED"),
+        (404, "AI_MODEL_UNAVAILABLE"),
+        (429, "AI_PROVIDER_LIMITED"),
+        (500, "AI_PROVIDER_UNAVAILABLE"),
+    ],
+)
+def test_upstream_errors_are_actionable_and_do_not_expire_user_login(monkeypatch, status, code):
+    body = BytesIO(b'{"error":{"message":"private-test-key private-prompt"}}')
+
+    class Broken:
+        def open(self, *args, **kwargs):
+            raise HTTPError(
+                "https://api.openai.com/v1/responses", status, "private-error", {}, body
+            )
+
+    monkeypatch.setattr("app.modules.ai.provider.build_opener", lambda *args: Broken())
+    with pytest.raises(DomainError) as caught:
+        OpenAIProvider(settings()).plan([], "Question")
+    assert caught.value.code == code
+    assert caught.value.status == 503  # Upstream 401 must not become the user's auth failure.
+    assert "private" not in caught.value.message
+    assert body.closed
+
+
+def test_provider_timeout_is_distinguishable_from_network_failure(monkeypatch):
+    class Slow:
+        def open(self, *args, **kwargs):
+            raise TimeoutError("private-timeout-payload")
+
+    monkeypatch.setattr("app.modules.ai.provider.build_opener", lambda *args: Slow())
+    with pytest.raises(DomainError) as caught:
+        OpenAIProvider(settings()).plan([], "Question")
+    assert caught.value.code == "AI_PROVIDER_TIMEOUT"

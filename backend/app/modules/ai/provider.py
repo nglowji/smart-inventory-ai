@@ -41,6 +41,45 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
+def provider_http_error(status: int) -> DomainError:
+    # Map only HTTP status. Provider error bodies can echo keys, prompts or account details.
+    if status == 401:
+        return DomainError(
+            503,
+            "AI_PROVIDER_AUTH_FAILED",
+            "Dịch vụ AI từ chối xác thực. Quản trị viên cần kiểm tra API key.",
+        )
+    if status == 403:
+        return DomainError(
+            503,
+            "AI_PROVIDER_ACCESS_DENIED",
+            "Cấu hình hiện tại không được phép truy cập dịch vụ AI.",
+        )
+    if status == 404:
+        return DomainError(
+            503,
+            "AI_MODEL_UNAVAILABLE",
+            "Không truy cập được model hoặc endpoint AI đã cấu hình.",
+        )
+    if status == 400:
+        return DomainError(
+            503,
+            "AI_PROVIDER_REQUEST_REJECTED",
+            "Dịch vụ AI không chấp nhận cấu hình gọi model. "
+            "Quản trị viên cần kiểm tra model và API.",
+        )
+    if status == 429:
+        return DomainError(
+            503,
+            "AI_PROVIDER_LIMITED",
+            "Dịch vụ AI đã giới hạn yêu cầu hoặc hạn mức sử dụng. "
+            "Vui lòng thử lại sau hoặc liên hệ quản trị viên.",
+        )
+    return DomainError(
+        503, "AI_PROVIDER_UNAVAILABLE", "Dịch vụ AI tạm thời không khả dụng. Vui lòng thử lại sau."
+    )
+
+
 class OpenAIProvider:
     def __init__(self, settings: Settings):
         self.settings = settings
@@ -108,7 +147,15 @@ class OpenAIProvider:
                     raise ValueError("Arguments must be an object")
                 result.append(ToolCall(call["name"], arguments))
             return result
-        except (HTTPError, URLError, TimeoutError, OSError):
+        except HTTPError as exc:
+            error = provider_http_error(exc.code)
+            exc.close()
+            raise error from None
+        except TimeoutError:
+            raise DomainError(
+                503, "AI_PROVIDER_TIMEOUT", "Dịch vụ AI phản hồi quá chậm. Vui lòng thử lại."
+            ) from None
+        except (URLError, OSError):
             raise DomainError(
                 503,
                 "AI_PROVIDER_UNAVAILABLE",
